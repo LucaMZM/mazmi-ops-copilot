@@ -30,7 +30,7 @@ Gemini/OpenAI/Ollama real calls, real audio, full Compose startup, production de
 
 Local Git metadata was separated with git init --separate-git-dir to ~/Developer/mazmi-ops-copilot.git because iCloud was evicting loose objects and causing mmap timeouts. The working tree remains on Desktop; its .git file points to that durable directory. Existing objects and index were preserved. Keep that local metadata directory when moving this working tree; fresh GitHub clones are ordinary self-contained repositories.
 
-Publication target: https://github.com/LucaMZM/mazmi-ops-copilot. Remote CI and README rendering results will be appended only after actually observed.
+Publication target: https://github.com/LucaMZM/mazmi-ops-copilot. Initial public run 39434279250: frontend job passed npm ci, typecheck, lint, all 27 tests, build and Compose configuration validation. Backend container initialization failed before tests: GitHub runner parsed a single-quoted --health-cmd as separate Docker flags (unknown -U). The workflow was corrected to use double quotes. Backend CI remains pending the next observed run; local backend tests remain 111 passing.
 
 ---
 
