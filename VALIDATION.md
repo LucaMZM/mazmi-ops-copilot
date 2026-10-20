@@ -32,6 +32,15 @@ Local Git metadata was separated with git init --separate-git-dir to ~/Developer
 
 Publication target: https://github.com/LucaMZM/mazmi-ops-copilot. Initial public run 39434279250: frontend job passed npm ci, typecheck, lint, all 27 tests, build and Compose configuration validation. Backend container initialization failed before tests: GitHub runner parsed a single-quoted --health-cmd as separate Docker flags (unknown -U). The workflow was corrected to use double quotes. Backend CI remains pending the next observed run; local backend tests remain 111 passing.
 
+## Verified public publication
+
+- Public repository: https://github.com/LucaMZM/mazmi-ops-copilot, default branch main. Baseline commit 87635ed3e8b36521df8163aa0c9cffb062c3bfa9; CI fix fd4fbaf0a6162eea81477661156a76198b0e5047. No force-push, production hosting or live AI call.
+- **Remote CI passed:** [run 39434518426](https://github.com/LucaMZM/mazmi-ops-copilot/actions/runs/39434518426), both backend and frontend successful. Ubuntu installed the committed lockfiles from a fresh checkout. Backend: 111 passed, 0 skipped, 7.97s, Ruff, migrations and offline SQL retrieval evaluation. Frontend: 27 passed, typecheck, lint, production build and Compose config validation. The earlier failed run is retained above with its cause and correction.
+- Public GitHub README checked in a real logged-out browser: all **35 image occurrences loaded with nonzero natural width**, including the six screenshots and both badge groups. Top badges, Tech Stack logos/names/versions, screenshots and the rendered Mermaid diagram were visually checked. The live Shields CI SVG returned **CI: passing**. A short cache parameter prevents retaining the first-run failure image in the GitHub image proxy.
+- Exact staged content reviewed before first push: **100 files**, no forbidden local/secret paths and no detected vendor-key, token, private-key or former fixed demo-password signatures. Both example API keys blank. Commits use GitHub noreply identity. This is a targeted review, not a guarantee of zero security vulnerabilities; the five development advisories remain disclosed.
+- Final documentation commit records these observations. The workflow will also run for that commit; its eventual result is available in Actions. All application code in it is unchanged from the passing run above.
+
+
 ---
 
 # Validación actual: producto y demo sin clave — 20 de octubre de 2026
