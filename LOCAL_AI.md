@@ -26,14 +26,16 @@ Follow the native dependency/database setup in [README.md](README.md). Keep the 
 export MAZMI_ENV_FILE="$PWD/profiles/ollama.env.example"
 cd backend
 python -m app.migrate
-uvicorn app.main:app --host 127.0.0.1 --port 8000
+uvicorn app.main:app --host 127.0.0.1 --port 8010
 
 # Separate terminal, from the repository root:
 cd frontend
-npm run dev
+BACKEND_URL=http://127.0.0.1:8010 npm run dev
 ```
 
 The additional profile is read after the root `.env`; exported environment variables take precedence over both. Inspect conflicting exported `GENERATION_PROVIDER`, `EMBEDDING_PROVIDER` or `DEMO_MODE` values before debugging the profile. Keep private overrides out of the tracked example. `APP_ENV=development`, `DEMO_MODE=false`, both providers `ollama`, context **4096**, request timeout **120 seconds** and configured embedding dimensions **768** are explicit in the profile. Restart the backend after configuration changes. No `OPENAI_API_KEY` or `GEMINI_API_KEY` is required for these operations.
+
+This session used 8010 because another project's existing service occupied 8000; it was left untouched. For a production frontend build, set the same `BACKEND_URL` when running `npm run build`, then `npm start`. Changing it only at startup does not rewrite a previously built proxy. Check backend health at `http://127.0.0.1:8010/health`.
 
 Start the frontend with its existing dependencies. Open localhost:3000, register a local account and select a workspace. Settings reports configuration separately from verification. **Check local** explicitly runs fictional structured-output and embedding requests; GET `/api/system` itself performs no provider network requests. A result belongs to that process and configuration, expires after **300 seconds**, and does not prove continuous liveness or that all product journeys passed. Concurrent probes are rejected rather than queued indefinitely. A failed probe is shown honestly and does not disable ordinary text input.
 
