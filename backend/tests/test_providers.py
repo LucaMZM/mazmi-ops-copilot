@@ -49,7 +49,7 @@ def test_native_schema_and_tool_result_translation():
         tools=[],
     )
     assert response.status == "completed"
-    assert seen[0]["format"] == {"type": "object"} and seen[0]["think"] is False
+    assert seen[0]["format"] == {"type": "object"} and seen[0]["think"] is None
     assert seen[0]["messages"][-1] == {"role": "tool", "tool_name": "get_tickets", "content": "[]"}
 
 
@@ -179,3 +179,118 @@ def test_model_digest_change_during_embedding_is_rejected(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="cambió"):
         rag.embed_texts(["document"])
+
+
+@pytest.mark.parametrize(
+    "failure,fragment",
+    [
+        (httpx.ConnectError("private connection address"), "conectar"),
+        (httpx.ReadTimeout("private request text"), "tiempo"),
+    ],
+)
+def test_local_transport_failures_are_bounded_and_sanitized(failure, fragment):
+    def server(request):
+        assert request.extensions["timeout"]["connect"] == 5
+        assert request.extensions["timeout"]["read"] == settings.ollama_timeout_seconds
+        raise failure
+
+    with pytest.raises(ProviderUnavailable, match=fragment) as exc:
+        Ollama(httpx.MockTransport(server)).create(model="qwen3:4b", input=[])
+    assert "private" not in str(exc.value)
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        [],
+        {"done": True},
+        {"message": []},
+        {"message": {"content": 42}},
+        {"message": {"tool_calls": [{"function": {"name": "x", "arguments": "{}"}}]}},
+        {
+            "message": {
+                "tool_calls": [{"function": {"name": "x", "arguments": {"n": float("inf")}}}]
+            }
+        },
+    ],
+)
+def test_local_malformed_responses_fail_closed(data):
+    # allow_nan=True here intentionally simulates a malformed upstream JSON body.
+    client = Ollama(httpx.MockTransport(lambda r: httpx.Response(200, text=json.dumps(data))))
+    with pytest.raises(ProviderUnavailable):
+        client.create(model="qwen3:4b", input=[])
+
+
+def test_local_missing_model_has_actionable_error_without_downloading():
+    requests = []
+
+    def server(request):
+        requests.append(request.url.path)
+        return httpx.Response(404, text="private path/model name")
+
+    with pytest.raises(ProviderUnavailable, match="no se descargó"):
+        Ollama(httpx.MockTransport(server)).create(model="absent", input=[])
+    assert requests == ["/api/chat"]
+
+
+def test_local_early_stream_exit_closes_transport_without_consuming_rest():
+    class Frames(httpx.SyncByteStream):
+        consumed = 0
+        closed = False
+
+        def __iter__(self):
+            self.consumed += 1
+            yield b'{"message":{"content":"Hola"},"done":false}\n'
+            self.consumed += 1
+            yield b'{"message":{"content":" mundo"},"done":true}\n'
+
+        def close(self):
+            self.closed = True
+
+    frames = Frames()
+    client = Ollama(httpx.MockTransport(lambda r: httpx.Response(200, stream=frames)))
+    with client.create(model="qwen3:4b", input=[], stream=True) as events:
+        assert next(events).delta == "Hola"
+    assert frames.closed and frames.consumed == 1
+
+
+def test_local_context_is_configured_and_models_unload(monkeypatch):
+    monkeypatch.setattr(settings, "ollama_num_ctx", 4096)
+    payload = Ollama().payload({"model": "qwen3:4b", "input": []})
+    assert payload["options"]["num_ctx"] == 4096
+    assert payload["keep_alive"] == 0 and payload["think"] is None
+    assert "temperature" not in payload["options"] and payload["options"]["seed"] == 42
+
+
+def test_local_thinking_is_not_exposed_in_completed_or_streamed_text():
+    frame = {"message": {"thinking": "private-reasoning", "content": "Hola"}, "done": True}
+    client = Ollama(httpx.MockTransport(lambda r: httpx.Response(200, json=frame)))
+    result = client.create(model="qwen3:4b", input=[])
+    assert result.output_text == "Hola" and "private" not in str(vars(result))
+    frames = [
+        {"message": {"thinking": "private-reasoning"}, "done": False},
+        frame,
+    ]
+    client = Ollama(
+        httpx.MockTransport(
+            lambda r: httpx.Response(200, text="\n".join(json.dumps(f) for f in frames))
+        )
+    )
+    with client.create(model="qwen3:4b", input=[], stream=True) as stream:
+        events = list(stream)
+    assert [e.delta for e in events if e.type == "response.output_text.delta"] == ["Hola"]
+    assert events[-1].response.output_text == "Hola"
+
+
+@pytest.mark.parametrize("message", [None, [], "invalid"])
+def test_local_stream_rejects_non_object_messages(message):
+    client = Ollama(
+        httpx.MockTransport(
+            lambda r: httpx.Response(200, text=json.dumps({"message": message, "done": True}))
+        )
+    )
+    with (
+        pytest.raises(ProviderUnavailable, match="streaming Ollama incompatible"),
+        client.create(model="qwen3:4b", input=[], stream=True) as events,
+    ):
+        list(events)

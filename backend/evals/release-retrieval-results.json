@@ -1,0 +1,239 @@
+{
+  "mode": "deterministic-embeddings",
+  "k": 6,
+  "documents": 13,
+  "cases": 8,
+  "before_vector": {
+    "recall_at_6": 0.6666666666666666,
+    "mrr": 0.6666666666666666,
+    "source_top1_accuracy": 0.6666666666666666,
+    "source_precision": 0.5833333333333334,
+    "unanswerable_no_evidence_rate": 0.5,
+    "answerable_false_abstention_rate": 0.0,
+    "mean_retrieval_ms": 0.406,
+    "cases": [
+      {
+        "question": "¿Cuántos días de vacaciones hay?",
+        "kind": "known_answer",
+        "expected_source": "vacaciones.txt",
+        "sources": [
+          "vacaciones.txt",
+          "vacaciones-copia.txt"
+        ],
+        "rank": 1,
+        "fact_in_context": true,
+        "no_evidence": false,
+        "retrieval_ms": 0.69
+      },
+      {
+        "question": "¿Qué necesitan los gastos de viaje?",
+        "kind": "known_answer",
+        "expected_source": "gastos.txt",
+        "sources": [
+          "gastos.txt"
+        ],
+        "rank": 1,
+        "fact_in_context": true,
+        "no_evidence": false,
+        "retrieval_ms": 0.378
+      },
+      {
+        "question": "¿Qué requieren los accesos a producción?",
+        "kind": "known_answer",
+        "expected_source": "seguridad.txt",
+        "sources": [
+          "seguridad.txt"
+        ],
+        "rank": 1,
+        "fact_in_context": true,
+        "no_evidence": false,
+        "retrieval_ms": 0.366
+      },
+      {
+        "question": "Código ZXQ747",
+        "kind": "exact_identifier",
+        "expected_source": "procedimiento-7.txt",
+        "sources": [
+          "procedimiento-0.txt",
+          "procedimiento-1.txt",
+          "procedimiento-2.txt",
+          "procedimiento-3.txt",
+          "procedimiento-4.txt",
+          "procedimiento-5.txt"
+        ],
+        "rank": null,
+        "fact_in_context": false,
+        "no_evidence": false,
+        "retrieval_ms": 0.351
+      },
+      {
+        "question": "Código ZXQ746",
+        "kind": "similar_documents",
+        "expected_source": "procedimiento-6.txt",
+        "sources": [
+          "procedimiento-0.txt",
+          "procedimiento-1.txt",
+          "procedimiento-2.txt",
+          "procedimiento-3.txt",
+          "procedimiento-4.txt",
+          "procedimiento-5.txt"
+        ],
+        "rank": null,
+        "fact_in_context": false,
+        "no_evidence": false,
+        "retrieval_ms": 0.35
+      },
+      {
+        "question": "¿Cuál es la política de submarinos?",
+        "kind": "unanswerable",
+        "expected_source": null,
+        "sources": [],
+        "rank": null,
+        "fact_in_context": false,
+        "no_evidence": true,
+        "retrieval_ms": 0.425
+      },
+      {
+        "question": "¿Cuántas vacaciones tienen los empleados de Marte?",
+        "kind": "unanswerable_near_topic",
+        "expected_source": null,
+        "sources": [
+          "vacaciones.txt",
+          "vacaciones-copia.txt"
+        ],
+        "rank": null,
+        "fact_in_context": false,
+        "no_evidence": false,
+        "retrieval_ms": 0.327
+      },
+      {
+        "question": "¿Cuánto se conserva la auditoría?",
+        "kind": "injection_document",
+        "expected_source": "auditoria.txt",
+        "sources": [
+          "auditoria.txt"
+        ],
+        "rank": 1,
+        "fact_in_context": true,
+        "no_evidence": false,
+        "retrieval_ms": 0.364
+      }
+    ]
+  },
+  "after_hybrid": {
+    "recall_at_6": 1.0,
+    "mrr": 1.0,
+    "source_top1_accuracy": 1.0,
+    "source_precision": 0.7222222222222222,
+    "unanswerable_no_evidence_rate": 0.5,
+    "answerable_false_abstention_rate": 0.0,
+    "mean_retrieval_ms": 0.683,
+    "cases": [
+      {
+        "question": "¿Cuántos días de vacaciones hay?",
+        "kind": "known_answer",
+        "expected_source": "vacaciones.txt",
+        "sources": [
+          "vacaciones.txt"
+        ],
+        "rank": 1,
+        "fact_in_context": true,
+        "no_evidence": false,
+        "retrieval_ms": 0.854
+      },
+      {
+        "question": "¿Qué necesitan los gastos de viaje?",
+        "kind": "known_answer",
+        "expected_source": "gastos.txt",
+        "sources": [
+          "gastos.txt"
+        ],
+        "rank": 1,
+        "fact_in_context": true,
+        "no_evidence": false,
+        "retrieval_ms": 0.652
+      },
+      {
+        "question": "¿Qué requieren los accesos a producción?",
+        "kind": "known_answer",
+        "expected_source": "seguridad.txt",
+        "sources": [
+          "seguridad.txt"
+        ],
+        "rank": 1,
+        "fact_in_context": true,
+        "no_evidence": false,
+        "retrieval_ms": 0.627
+      },
+      {
+        "question": "Código ZXQ747",
+        "kind": "exact_identifier",
+        "expected_source": "procedimiento-7.txt",
+        "sources": [
+          "procedimiento-7.txt",
+          "procedimiento-0.txt",
+          "procedimiento-1.txt",
+          "procedimiento-2.txt",
+          "procedimiento-3.txt",
+          "procedimiento-4.txt"
+        ],
+        "rank": 1,
+        "fact_in_context": true,
+        "no_evidence": false,
+        "retrieval_ms": 0.726
+      },
+      {
+        "question": "Código ZXQ746",
+        "kind": "similar_documents",
+        "expected_source": "procedimiento-6.txt",
+        "sources": [
+          "procedimiento-6.txt",
+          "procedimiento-0.txt",
+          "procedimiento-1.txt",
+          "procedimiento-2.txt",
+          "procedimiento-3.txt",
+          "procedimiento-4.txt"
+        ],
+        "rank": 1,
+        "fact_in_context": true,
+        "no_evidence": false,
+        "retrieval_ms": 0.622
+      },
+      {
+        "question": "¿Cuál es la política de submarinos?",
+        "kind": "unanswerable",
+        "expected_source": null,
+        "sources": [],
+        "rank": null,
+        "fact_in_context": false,
+        "no_evidence": true,
+        "retrieval_ms": 0.762
+      },
+      {
+        "question": "¿Cuántas vacaciones tienen los empleados de Marte?",
+        "kind": "unanswerable_near_topic",
+        "expected_source": null,
+        "sources": [
+          "vacaciones.txt"
+        ],
+        "rank": null,
+        "fact_in_context": false,
+        "no_evidence": false,
+        "retrieval_ms": 0.6
+      },
+      {
+        "question": "¿Cuánto se conserva la auditoría?",
+        "kind": "injection_document",
+        "expected_source": "auditoria.txt",
+        "sources": [
+          "auditoria.txt"
+        ],
+        "rank": 1,
+        "fact_in_context": true,
+        "no_evidence": false,
+        "retrieval_ms": 0.622
+      }
+    ]
+  },
+  "limitations": "Small synthetic benchmark, one expected source per answerable query. No-evidence rate is a retrieval abstention proxy, not semantic answer correctness. Latency is a single local run including embeddings; no production SLA. Injection resistance is tested separately with adversarial provider doubles."
+}

@@ -1083,6 +1083,31 @@ summary {
 .settingSection code {
   font-size: 11px;
 }
+.localCheckControls {
+  min-width: 0;
+}
+.localCheckControls button {
+  margin-bottom: 12px;
+}
+.localCheckControls p {
+  overflow-wrap: anywhere;
+}
+.providerContext {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}
+.providerContext code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: inherit;
+}
 .segmented {
   display: flex;
   border: 1px solid var(--line);

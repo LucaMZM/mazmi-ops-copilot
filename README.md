@@ -13,7 +13,7 @@ Built as a working portfolio project with a direct Python RAG pipeline, real Pos
 
 **Try it without an API key:** the [development demo](DEMO.md) uses clearly labelled deterministic fixtures. It runs the same authentication, document ingestion, hybrid retrieval, approvals and audit paths. It is not a Gemini quality demo or a publicly hosted service.
 
-> **Validation boundary:** PostgreSQL/pgvector and browser journeys have been exercised locally. Provider SDK contracts are tested with simulated HTTP responses. Gemini, OpenAI, Ollama and real microphone/TTS operation still need live verification. This is a portfolio baseline, not a production deployment.
+> **Validation boundary:** Automated provider doubles, real PostgreSQL integration and real-model checks are reported separately in [VALIDATION.md](VALIDATION.md). Qwen3 4B and EmbeddingGemma now have real local capability and RAG measurements. The eight-question live RAG run retrieved every expected document but falsely abstained on two answerable questions; a ticket-read request timed out. These limits prevent a validated `v1.0.0` tag. Gemini, OpenAI and real voice remain unverified. This is a portfolio demonstration, not a production deployment.
 
 ## Product
 
@@ -42,6 +42,12 @@ Real browser captures of the running development demo, using fictional data and 
 | ![Audit history](docs/screenshots/activity.png) | ![Provider configuration](docs/screenshots/settings.png) |
 
 [Mobile Copilot](docs/screenshots/copilot-mobile.png) · [Source inspector](docs/screenshots/source-inspector.png) · [Capture provenance](docs/screenshots/README.md)
+
+### Real local-model evidence — 22 October
+
+![Qwen3 documentary answer and original stored passage](docs/screenshots/ollama-source.jpg)
+
+The fictional INC-17 document was uploaded, embedded with EmbeddingGemma (measured **768 dimensions**), retrieved through PostgreSQL/pgvector and selected by Qwen3 4B. The backend renders the quoted passage and citation. [Explicit local connection check](docs/screenshots/ollama-settings.jpg) · [Mobile](docs/screenshots/ollama-mobile.jpg). These are browser captures from the real local profile, separate from the eight preserved demo captures above.
 
 ## Architecture
 
@@ -79,9 +85,9 @@ Vector search currently calculates exact distance inside the filtered collection
 
 ### Evaluation, without inflated claims
 
-The reproducible small fixture evaluation uses real SQL and synthetic embeddings. Its recorded hybrid Recall@6 and MRR are both 1.0 on eight questions; this measures plumbing on that corpus, **not real model accuracy**. The adversarial grounding dataset records **14/15 correct abstentions**, with 0/4 false abstentions on answerable examples. One semantic relationship case remains unresolved: matching words can describe the wrong relationship when the mock evaluator lies.
+The reproducible small fixture evaluation uses real SQL and synthetic embeddings. Its recorded hybrid Recall@6 and MRR are both 1.0 on eight questions; this measures plumbing on that corpus, **not real model accuracy**. On the same original 19-case grounding corpus, the new relation guard changes correct abstentions from **14/15 to 15/15**, with 0/4 false abstentions. The expanded 27-case corpus records **20/21 correct abstentions**, **1/6 false abstentions** and **5/6 answer precision**. These are offline assessor-double results: one conditional-policy applicability failure and one conservative refusal remain exposed. They do not measure real model accuracy or universal semantic entailment.
 
-See [validation and limitations](VALIDATION.md), [retrieval report](backend/evals/product-retrieval-results.json) and [paired grounding report](backend/evals/product-grounding-results.json). Historical before/after grounding observations are retained; they are not a benchmark of Gemini.
+See [validation and limitations](VALIDATION.md), [retrieval report](backend/evals/product-retrieval-results.json) and [historical paired grounding report](backend/evals/product-grounding-results.json) and [expanded offline report](backend/evals/release-grounding-results.json). Frozen historical observations are retained; they are not a fresh paired model benchmark.
 
 ## ASK, DO and human control
 
@@ -97,7 +103,7 @@ A mutation first becomes a persisted proposal. Only the requesting user in that 
 |---|---|---|
 | Development demo | Deterministic topic fixtures / synthetic vectors | Real local browser and database journeys; no model calls |
 | Gemini, default configuration | `gemini-3.5-flash-lite` / `gemini-embedding-2`, 768d | Official SDK contracts mocked; **live API pending** |
-| Ollama, optional | `qwen3:4b` / `embeddinggemma`, 768d | Native API adapter mocked; local models not downloaded |
+| Ollama, opt-in local profile | `qwen3:4b` / `embeddinggemma`, measured 768d | Real Spanish/JSON/stream/tool/embedding fixtures and four-document RAG; measured reliability limits in [VALIDATION.md](VALIDATION.md) |
 | OpenAI, optional | `gpt-5-mini` / `text-embedding-3-small`, 1536d | Adapter mocked; live API pending; may incur charges |
 
 Gemini handles structured outputs, provider streaming, embeddings and function declarations through the official SDK. Quota errors are sanitized; 429 does not trigger an automatic retry, model switch or paid fallback. Actual access, free quota and model availability must be checked for your project. [Gemini setup and live smoke test](GEMINI.md).
@@ -155,7 +161,7 @@ Create a dedicated database with your local PostgreSQL tooling and set `DATABASE
 
 **For the no-key demo, follow [DEMO.md](DEMO.md) before starting the backend.** Create a new database ending in `_demo`, set `APP_ENV=development` and `DEMO_MODE=true`, then run `python -m app.demo` from `backend`. The seed refuses populated databases before migration. It prints a newly generated password for `demo@mazmi.local` to your local terminal. Store it privately; there is no universal demo password.
 
-For normal provider mode, leave demo disabled and configure the selected provider only in `.env`. Then, from the repository root:
+For no-key real-model operation, use [LOCAL_AI.md](LOCAL_AI.md) and the tracked opt-in profile; it preserves the cloud defaults and private database configuration. For other normal provider modes, leave demo disabled and configure the selected provider only in `.env`. Then, from the repository root:
 
 ```bash
 # Terminal 1, virtualenv active
@@ -180,6 +186,8 @@ Open http://localhost:3000. The API documentation is at http://localhost:8000/do
 | `DATABASE_URL`, `POSTGRES_*` | Native connection / Compose database configuration |
 | `APP_ENV`, `DEMO_MODE` | Production default / explicit isolated development demo |
 | `GENERATION_PROVIDER`, `EMBEDDING_PROVIDER` | Independent `gemini`, `ollama` or `openai` adapters |
+| `MAZMI_ENV_FILE` | Optional additional profile; exported variables take precedence |
+| `OLLAMA_NUM_CTX`, `OLLAMA_TIMEOUT_SECONDS` | Bounded local context / request timeout |
 | `GEMINI_API_KEY`, `OPENAI_API_KEY` | Server-only optional credentials; blank in the example |
 | `GEMINI_MODEL`, `GEMINI_EMBEDDING_MODEL` | Cloud model identifiers |
 | `EMBEDDING_DIMENSIONS`, `EMBEDDING_REVISION` | Collection compatibility and deliberate reindexing |
@@ -187,7 +195,7 @@ Open http://localhost:3000. The API documentation is at http://localhost:8000/do
 | `COOKIE_SECURE` | `true` for HTTPS deployments; local HTTP uses `false` |
 | `STT_MODEL_PATH`, `PIPER_MODEL_PATH`, `TTS_PROVIDER` | Optional speech configuration |
 
-Restart the backend after changing provider configuration. Settings reports configuration, not a live connectivity certification.
+Restart the backend after changing provider configuration. Settings reports configuration separately from an explicit local probe. Its last result expires after 300 seconds; reading settings never performs provider network I/O and does not certify continuous availability.
 
 ### Database and containers
 
@@ -223,7 +231,7 @@ npm run lint
 npm run build
 ```
 
-Integration tests create isolated schemas, and never need a paid key. Without `TEST_DATABASE_URL`, those cases are skipped rather than reported as passed. Local publication validation: **111 backend tests, 27 frontend tests**, Ruff, ESLint, typecheck and production build. [GitHub Actions](.github/workflows/ci.yml) runs the same core checks on Ubuntu with PostgreSQL/pgvector; the linked CI badge is the authoritative remote result.
+Integration tests create isolated schemas, and never need a paid key. Without `TEST_DATABASE_URL`, those cases are skipped rather than reported as passed. The published 20 October baseline passed **111 backend tests and 27 frontend tests**, Ruff, ESLint, typecheck and production build. The dated release report records subsequent checks and expected failures; do not infer local-model success from the CI badge. [GitHub Actions](.github/workflows/ci.yml) runs the same core checks on Ubuntu with PostgreSQL/pgvector; the linked CI badge is the authoritative remote result.
 
 ## Demo walkthrough
 
@@ -231,8 +239,8 @@ Sign in with the generated local demo credentials, switch between Operations and
 
 ## Current limits and next steps
 
-This baseline needs live Gemini evaluation, real voice verification and full Compose startup testing. The remaining semantic relationship grounding failure is documented, not hidden. Injection controls reduce specific risks; they do not establish universal prompt-injection immunity.
+Live Gemini evaluation, real voice and full Compose startup remain pending. The local-profile capability and RAG results are recorded with their actual evidence in [VALIDATION.md](VALIDATION.md). Conditional applicability and implicit-context failures remain documented, even when citation IDs are valid. Injection controls reduce specific risks; they do not establish universal prompt-injection immunity.
 
-There is no email recovery, invitation/RBAC system, OCR, original-file storage or durable ingestion queue. Indexing is synchronous; an abrupt stop may leave a document processing. Disconnect checkpoints can roll back an uncommitted chat, but cannot undo an approved transaction or guarantee cancellation of an in-flight provider request. Review history before retrying actions.
+There is no email recovery, invitation/RBAC system, OCR, original-file storage or durable ingestion queue. Indexing is synchronous; an abrupt stop may leave a document processing. Restart/recovery and retry limits are described by the current backend tests; there is no durable ingestion queue. Disconnect checkpoints can roll back an uncommitted chat, but cannot undo an approved transaction or guarantee cancellation of an in-flight provider request. Review history before retrying actions.
 
 Large-corpus retrieval, backup restoration, operational quotas and HTTPS deployment require further work. Development-tool dependency advisories are recorded in [VALIDATION.md](VALIDATION.md); the project is not claimed vulnerability-free. Priority next steps are live provider contract checks, a human-reviewed RAG evaluation set, semantic sufficiency improvements and operational hardening—not more unverified features.

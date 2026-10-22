@@ -171,6 +171,107 @@ def test_reject_does_not_execute(api, monkeypatch):
     assert api.get("/api/tickets").json() == []
 
 
+def test_same_workspace_member_cannot_approve_another_users_proposal(api, monkeypatch):
+    action = propose(api, monkeypatch)["pending_action"]["id"]
+    original_workspace = api.get("/api/auth/me").json()["workspace_id"]
+    other = TestClient(main.app, headers={"Origin": "http://localhost:3000"})
+    assert (
+        other.post(
+            "/api/auth/register",
+            json={
+                "email": "colleague@example.com",
+                "password": "colleague-test-password",
+                "workspace_name": "Colleague",
+            },
+        ).status_code
+        == 201
+    )
+    with main.get_conn() as conn:
+        conn.execute(
+            "INSERT INTO workspace_members(user_id,workspace_id) SELECT id,%s FROM users WHERE email=%s",
+            (original_workspace, "colleague@example.com"),
+        )
+    assert (
+        other.post("/api/auth/workspace", json={"workspace_id": original_workspace}).status_code
+        == 200
+    )
+    assert other.get("/api/actions").json() == []
+    assert other.post(f"/api/actions/{action}/decision", json={"approved": True}).status_code == 404
+    assert api.get("/api/actions").json()[0]["status"] == "PENDING"
+    assert api.get("/api/tickets").json() == []
+    assert api.post(f"/api/actions/{action}/decision", json={"approved": True}).status_code == 200
+
+
+def test_invalid_stored_proposal_does_not_execute(api, monkeypatch):
+    action = propose(api, monkeypatch)["pending_action"]["id"]
+    with main.get_conn() as conn:
+        conn.execute(
+            "UPDATE pending_actions SET payload=%s::jsonb WHERE id=%s",
+            ('{"title":"Invalid","description":"Invalid","priority":"ROOT"}', action),
+        )
+    assert api.post(f"/api/actions/{action}/decision", json={"approved": True}).status_code == 409
+    assert api.get("/api/actions").json()[0]["status"] == "PENDING"
+    assert api.get("/api/tickets").json() == []
+    assert "action.executed" not in [event["type"] for event in api.get("/api/activity").json()]
+
+
+@pytest.mark.parametrize(
+    "decision", [{"approved": "true"}, {"approved": 1}, {"approved": True, "payload": {}}]
+)
+def test_approval_contract_cannot_coerce_or_replace_proposal(api, monkeypatch, decision):
+    action = propose(api, monkeypatch)["pending_action"]["id"]
+    assert api.post(f"/api/actions/{action}/decision", json=decision).status_code == 422
+    assert api.get("/api/actions").json()[0]["status"] == "PENDING"
+    assert api.get("/api/tickets").json() == []
+
+
+@pytest.mark.parametrize(
+    "message,mode", [("Crea un ticket", "ASK"), ("Resume el documento de tickets", "DO")]
+)
+def test_chat_boundary_rechecks_proposal_authorization(api, monkeypatch, message, mode):
+    monkeypatch.setattr(
+        main,
+        "answer",
+        lambda *args: (
+            "Untrusted adapter proposal",
+            {
+                "name": "create_ticket",
+                "payload": {"title": "No", "description": "No", "priority": "LOW"},
+            },
+            {"tools": [], "duration_ms": 0},
+        ),
+    )
+    assert api.post("/api/chat", json={"message": message, "mode": mode}).status_code == 502
+    assert api.get("/api/actions").json() == []
+    assert api.get("/api/tickets").json() == []
+    assert api.get("/api/conversations").json() == []
+
+
+def test_audit_failure_rolls_back_execution_and_allows_safe_retry(api, monkeypatch):
+    action = propose(api, monkeypatch)["pending_action"]["id"]
+    original_audit = main.audit
+
+    def unavailable_audit(conn, user, event, *args, **kwargs):
+        if event == "action.executed":
+            raise psycopg.OperationalError("simulated audit storage failure")
+        return original_audit(conn, user, event, *args, **kwargs)
+
+    monkeypatch.setattr(main, "audit", unavailable_audit)
+    decision = f"/api/actions/{action}/decision"
+    assert api.post(decision, json={"approved": True}).status_code == 503
+    assert api.get("/api/tickets").json() == []
+    assert api.get("/api/actions").json()[0]["status"] == "PENDING"
+    conversation = api.get("/api/actions").json()[0]["conversation_id"]
+    messages = api.get(f"/api/conversations/{conversation}").json()["messages"]
+    assert all("Acción ejecutada" not in message["content"] for message in messages)
+
+    monkeypatch.setattr(main, "audit", original_audit)
+    assert api.post(decision, json={"approved": True}).status_code == 200
+    assert api.post(decision, json={"approved": True}).status_code == 409
+    assert len(api.get("/api/tickets").json()) == 1
+    assert sum(event["type"] == "action.executed" for event in api.get("/api/activity").json()) == 1
+
+
 def test_invalid_inputs_and_workspace_scope(api):
     assert api.post("/api/chat", json={"message": "  "}).status_code == 422
     assert (

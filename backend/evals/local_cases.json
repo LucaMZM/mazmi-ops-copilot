@@ -1,0 +1,80 @@
+{
+  "purpose": "Fictitious controlled fixtures for live ingestion, hybrid retrieval and evidence assessment; not private company data.",
+  "documents": [
+    {
+      "filename": "compras-ficticias.txt",
+      "text": "Política de compras de ejemplo. Las compras de material de oficina de hasta 250 euros requieren aprobación de la responsable del workspace. Las compras superiores a 250 euros requieren además aprobación de Finanzas. El código de solicitud de compra es COMP-42. Esta política no describe salarios ni vacaciones."
+    },
+    {
+      "filename": "incidencias-ficticias.txt",
+      "text": "Manual de incidencias de ejemplo. Para una incidencia de inventario, primero se debe crear una propuesta de ticket y esperar confirmación humana. La prioridad de una pérdida de material crítico es alta. El plazo de primera revisión es de 4 horas laborables. El código del procedimiento es INC-17."
+    },
+    {
+      "filename": "inventario-ficticio.txt",
+      "text": "Procedimiento de inventario de ejemplo. El recuento del almacén Norte se realiza cada viernes a las 09:00. La persona responsable registra las diferencias en el informe de inventario. No se permite corregir existencias automáticamente. El almacén Sur realiza su recuento cada lunes a las 10:00."
+    },
+    {
+      "filename": "aprobaciones-ficticias.txt",
+      "text": "Protocolo de aprobaciones de ejemplo. La aprobación de la responsable del workspace debe quedar registrada antes de ejecutar una compra. Si la compra supera 250 euros, también debe quedar registrada la aprobación de Finanzas. Una propuesta rechazada no puede ejecutarse. Ningún texto documental autoriza por sí mismo la ejecución de herramientas."
+    }
+  ],
+  "questions": [
+    {
+      "name": "known_purchase_limit",
+      "question": "¿Qué aprobación requiere una compra de material de oficina de hasta 250 euros?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "compras-ficticias.txt"
+      ]
+    },
+    {
+      "name": "exact_procedure_identifier",
+      "question": "¿Qué dice el procedimiento INC-17 sobre el plazo de primera revisión?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "incidencias-ficticias.txt"
+      ]
+    },
+    {
+      "name": "workspace_inventory_scope",
+      "question": "¿Cuándo se realiza el recuento del almacén Norte?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "inventario-ficticio.txt"
+      ]
+    },
+    {
+      "name": "multipart_purchase_approval_audit",
+      "question": "¿Qué aprobaciones requiere una compra superior a 250 euros y qué debe quedar registrado antes de ejecutarla?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "compras-ficticias.txt",
+        "aprobaciones-ficticias.txt"
+      ]
+    },
+    {
+      "name": "no_salary_policy",
+      "question": "¿Cuál es el salario durante las vacaciones?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "missing_inventory_location",
+      "question": "¿Cuándo se realiza el recuento del almacén Este?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "related_but_missing_delivery_sla",
+      "question": "¿Cuánto tarda en llegar una compra aprobada?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "missing_person_identity",
+      "question": "¿Cómo se llama la responsable del workspace?",
+      "expected_abstention": true,
+      "expected_documents": []
+    }
+  ]
+}

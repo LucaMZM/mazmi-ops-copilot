@@ -1,62 +1,99 @@
-# IA local: puesta en marcha y límites
+# Local AI: Ollama profile and verification
 
-Ollama es un proveedor opcional de generación y embeddings. El valor predeterminado actual es Gemini (ver [GEMINI.md](GEMINI.md)); para seguir esta guía configura GENERATION_PROVIDER=ollama y EMBEDDING_PROVIDER=ollama. No necesita `OPENAI_API_KEY`; no hay fallback automático a OpenAI. El código nunca descarga modelos. Esta sesión validó contratos HTTP con mocks, no inferencia real: Ollama no estaba instalado y solo había aproximadamente 2,8 GiB libres.
+The opt-in [Ollama profile](profiles/ollama.env.example) runs generation and embeddings without a paid API key. It preserves the deterministic demo and the optional Gemini/OpenAI adapters. The repository-wide defaults remain Gemini; selecting this profile changes only the backend process you start. The application never downloads models or switches to a paid fallback.
 
-## Preparación manual, cuando haya espacio
+## Reuse an existing installation
 
-Los modelos publicados ocupan aproximadamente [2,5 GB para Qwen3 4B](https://ollama.com/library/qwen3:4b) y [622 MB para EmbeddingGemma](https://ollama.com/library/embeddinggemma). El espacio actual no basta. Planifica al menos 8–10 GiB libres más datos, backups y modelos de voz; es un margen orientativo, no un mínimo medido. Recomendamos 16 GiB de RAM para todo el stack; 8 GiB puede sufrir presión de memoria. La latencia en CPU debe medirse. No se ha medido rendimiento en este Mac.
-
-1. Instala Ollama desde su distribución oficial. EmbeddingGemma requiere Ollama 0.11.10 o posterior; usa una versión estable actual y ejecuta la prueba de capacidades de abajo.
-2. Solo después de disponer de espacio y decidir descargar, ejecuta manualmente:
+Check before changing anything:
 
 ```bash
-ollama serve  # omitir si la aplicación Ollama ya sirve en 11434
-# En otra terminal; estos comandos sí descargan modelos:
-ollama pull qwen3:4b
-ollama pull embeddinggemma
+ollama --version
+ollama list
+ollama ps
+curl --fail http://127.0.0.1:11434/api/version
 ```
 
-3. Copia `.env.example` a `.env` si todavía no existe (no sobrescribas configuración propia). Deja `OPENAI_API_KEY` vacía. Configura PostgreSQL con pgvector y sigue [MIGRATIONS.md](database/MIGRATIONS.md) antes de tocar una base existente.
-4. Desde `backend`, con las dependencias existentes en tu virtualenv:
+Use the existing daemon if it is already listening. Do not start a second server, reinstall Ollama or change another project's service configuration. On the validation machine, the existing installation is Ollama **0.40.7**, with `qwen3:4b` and `embeddinggemma` already installed. Inventory is not proof that a model completes a request; see [the dated evidence](VALIDATION.md).
+
+If a required model is absent, stop the local-model check and review disk/memory requirements before authorizing a download. No model download is part of the setup commands here. Do not silently substitute Qwen3 1.7B or another embedding model.
+
+## Start the isolated local profile
+
+Follow the native dependency/database setup in [README.md](README.md). Keep the real connection string privately in the root `.env`; use a dedicated evaluation database for experiments. Before starting against an existing database, read [database/MIGRATIONS.md](database/MIGRATIONS.md).
 
 ```bash
+# From the repository root, with the existing virtualenv active:
+export MAZMI_ENV_FILE="$PWD/profiles/ollama.env.example"
+cd backend
 python -m app.migrate
-python -m app.check_local
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+# Separate terminal, from the repository root:
+cd frontend
+npm run dev
 ```
 
-5. Desde `frontend`, con dependencias instaladas: `npm run dev`. Abre localhost:3000, crea una cuenta, sube un documento, pregunta por un hecho literal y prueba una pregunta sin respuesta. En DO, comprueba propuesta y confirmación desde Activity. El smoke test comprueba JSON estructurado, streaming, propuesta de tool y embeddings; nunca ejecuta la propuesta ni modifica la base.
+The additional profile is read after the root `.env`; exported environment variables take precedence over both. Inspect conflicting exported `GENERATION_PROVIDER`, `EMBEDDING_PROVIDER` or `DEMO_MODE` values before debugging the profile. Keep private overrides out of the tracked example. `APP_ENV=development`, `DEMO_MODE=false`, both providers `ollama`, context **4096**, request timeout **120 seconds** and configured embedding dimensions **768** are explicit in the profile. Restart the backend after configuration changes. No `OPENAI_API_KEY` or `GEMINI_API_KEY` is required for these operations.
 
-`/health` comprueba aplicación/base y declara proveedores; no certifica disponibilidad de modelos. Ollama inaccesible, modelo ausente o respuesta inválida producen errores controlados. Las respuestas documentales retienen deltas hasta validar evidencia/citas; no muestran tokens no validados.
+Start the frontend with its existing dependencies. Open localhost:3000, register a local account and select a workspace. Settings reports configuration separately from verification. **Check local** explicitly runs fictional structured-output and embedding requests; GET `/api/system` itself performs no provider network requests. A result belongs to that process and configuration, expires after **300 seconds**, and does not prove continuous liveness or that all product journeys passed. Concurrent probes are rejected rather than queued indefinitely. A failed probe is shown honestly and does not disable ordinary text input.
 
-## Proveedores y compatibilidad
+## Bounded capability check
 
-`GENERATION_PROVIDER` y `EMBEDDING_PROVIDER` aceptan `ollama`/`openai` independientemente. Solo la operación configurada con OpenAI necesita clave. `TTS_PROVIDER` también es independiente (piper por defecto). Reinicia el backend al cambiar configuración.
+With the profile still exported and the daemon idle:
 
-Ollama usa HTTP nativo `/api/chat`, `/api/embed` y `/api/tags` mediante httpx; no se presupone compatibilidad con OpenAI Responses. El adaptador convierte JSON Schema (`format`), streaming NDJSON, argumentos de tools y resultados `tool_name` al contrato interno. `think=false`, temperatura 0, contexto 8192 y `keep_alive=0` reducen memoria retenida a costa de recargas/latencia. Esquemas, autorización ASK/DO, citas y confirmación se validan siempre en backend. El soporte del modelo real se debe comprobar con `app.check_local` y los recorridos de producto.
+```bash
+# From backend; do not run alongside a build or another inference suite:
+python -m app.check_local
+```
 
-Referencias: [chat](https://docs.ollama.com/api/chat), [embeddings](https://docs.ollama.com/api/embed), [tools](https://docs.ollama.com/capabilities/tool-calling), [structured outputs](https://docs.ollama.com/capabilities/structured-outputs).
+This command checks installed model metadata, Spanish generation, structured JSON validated by Pydantic, streamed text deltas, a tool proposal with a synthetic read-only result, actual embedding dimensions and a fresh request after closing an early stream. It neither executes a tool nor writes documents/database data. Exit status is nonzero on failure. Its fixture prompts are intentionally public; do not substitute private documents into shared diagnostic output.
 
-## Colecciones y cambio de modelo
+A transport close does not establish immediate GPU cancellation. Capability advertising in `/api/show`, accepted HTTP parameters and a successful fixture are different observations. Initial real probes exposed incompatible thinking/sampling settings. With the installed Qwen3 preset, `think=null` (model default), seed 42 and a 1024-token budget produced the exact Spanish greeting in 23.305 seconds. The adapter preserves the model sampling defaults (observed temperature 0.6, top_p 0.95, top_k 20, min_p 0), uses context 4096 and never forwards the separate thinking field as an answer. Hard-coded greedy sampling and unsupported `think=false` were removed.
 
-EmbeddingGemma usa 768 dimensiones por defecto y prefijos distintos para documento/pregunta según [su ficha](https://huggingface.co/google/embeddinggemma-300m). `truncate=false` evita cortar entradas silenciosamente; superar su contexto de 2048 tokens produce error. Historias/consultas extensas requieren pruebas específicas.
+The later [full smoke report](backend/evals/ollama-smoke-results.json) preserves five successful capabilities and a failed counting-based cancellation fixture. A revised greeting-based early close and subsequent fresh request passed in a [separate selected check](backend/evals/ollama-cancellation-results.json). This cumulatively verifies the capabilities; it is not a single all-green full smoke. The [real RAG report](backend/evals/local-live-results.json) records four indexed policies, document Recall@6/MRR of 1.0, four correct negative abstentions and **two false abstentions out of four answerable questions**. The ticket-read journey separately returned a controlled 503 at the 120-second timeout. Simple function-calling fixtures passing does not establish reliable completion of every agent request. Do not increase context or hide failures to advertise a validated release.
 
-La identidad incluye proveedor, modelo, dimensiones, digest Ollama y versión de prefijos. En OpenAI incluye `EMBEDDING_REVISION` (legacy por defecto para preservar datos); si cambia un despliegue bajo el mismo nombre, cambia esa revisión manualmente. La API no permite detectar cambios internos de pesos OpenAI.
+Ollama uses native `/api/chat`, `/api/embed`, `/api/tags` and `/api/show` through httpx, not the OpenAI Responses protocol. The adapter maps JSON Schema, NDJSON streaming, function arguments and tool results to the application's internal contract. Backend schema validation, authorization, extractive evidence selection and confirmation remain authoritative.
 
-Ambas ramas de retrieval filtran la colección activa y workspace antes de calcular distancias. Un documento de otra colección puede seguir visible como ready, pero no se recupera hasta reindexarlo. Knowledge → Reindexar pide confirmación y vuelve a generar vectores desde chunks guardados. Preserva IDs/textos; reemplaza vectores y metadata en una transacción y revierte todo si falla. No conserva dos versiones vectoriales del mismo documento. No mezcles manualmente metadata o vectores. La migración 004 preserva los vectores OpenAI existentes; no los convierte en vectores locales.
+## Resources on an 8 GB Mac
 
-## Voz local opcional
+The observed MacBook Air M2 has 8 GB unified memory. Installed files are approximately **2.50 GB** for Qwen3 4B (`Q4_K_M`, 2,497,293,931 bytes) and **622 MB** for EmbeddingGemma (`BF16`, 621,875,917 bytes). File size does not equal resident memory. Context/KV cache, model reloads, browser, Next.js and PostgreSQL all compete for the same memory; measure pressure and latency on the target machine.
 
-Cuando haya espacio, instala explícitamente `pip install -r requirements-voice.txt` en el virtualenv. Estas dependencias opcionales no se instalaron ni ejecutaron en esta sesión.
+Serialize tests, builds and inference. A dedicated daemon can use `OLLAMA_NUM_PARALLEL=1` and `OLLAMA_MAX_LOADED_MODELS=1`; these are **daemon-start settings**, not application profile variables, and must not silently reconfigure a daemon shared with another project. The adapter requests `keep_alive=0` so models are released between calls, trading memory for reload latency. Do not assume generation and embeddings remain resident together. Close unnecessary applications, keep room for database backups and stop if memory pressure becomes sustained. A larger-memory machine is preferable for repeated evaluation; no minimum latency or hardware throughput is promised.
 
-- Faster-Whisper: prepara fuera del repositorio un modelo compatible CTranslate2 y asigna su carpeta absoluta a `STT_MODEL_PATH`. El cargador exige archivos locales (`local_files_only=True`), CPU/int8; no descarga por nombre.
-- Piper: prepara un modelo `.onnx` y su `.onnx.json` adyacente; configura `PIPER_MODEL_PATH` absoluto y, si procede, `PIPER_EXECUTABLE`. Comprueba licencia de la voz seleccionada.
-- El navegador pide permiso, graba hasta 60 segundos y envía audio solo a este backend. Requiere localhost o HTTPS. Tamaño máximo 10 MB; rechazo controlado si falta configuración. No se ha probado audio/micrófono real.
+## Collections, reindexing and migrations
 
-Referencias: [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper), [Piper](https://github.com/OHF-Voice/piper1-gpl).
+EmbeddingGemma is configured for 768 dimensions. The smoke test must measure the returned length; metadata advertising 768 is not the same measurement. Inputs have distinct document/query prefixes; `truncate=false` rejects overlong inputs rather than silently changing them. EmbeddingGemma's documented input context is 2048 tokens, so long chunks and questions need explicit boundary tests.
 
-Compose apunta a Ollama del host mediante host.docker.internal. No se ejecutó Docker en esta sesión. La imagen actual no incluye los extras/modelos de voz: para voz local usa el arranque nativo anterior; una ejecución en contenedor necesitaría instalación y montaje explícitos. No expongas Ollama ni PostgreSQL a Internet.
+Collection identity includes provider, model, dimensions, Ollama digest and prefix revision. Equal dimensions do not make demo, Gemini, OpenAI and Ollama vectors interchangeable. Both vector and FTS retrieval filter workspace, ready document state and the active collection before fusion. A document can remain visible but incompatible until explicitly reindexed in Knowledge. Reindexing preserves stored text/IDs and replaces vectors/metadata transactionally; failure rolls back to the previous collection. It does not retain a second vector version.
 
-## Calidad pendiente
+Migration **003** adds full-text search; **004** separates embedding collections and changes vector indexing. Existing OpenAI vectors are preserved, not converted to Ollama vectors. There is **no migration 005** for this release. Back up, test restoration, check free space and plan for table/index locks before applying migrations to a database with data. Never fix compatibility by editing metadata or marking a migration applied manually.
 
-El cambio de proveedor conserva las evaluaciones, pero no demuestra calidad semántica de Qwen3 ni EmbeddingGemma. El control de facetas bloquea ahora la falta literal de datos salariales; sigue documentado un caso con palabras presentes y relación equivocada. No se garantiza suficiencia semántica completa. Calibra retrieval y evalúa suficiencia con modelos reales antes de una demo empresarial.
+## Reproducible product evaluation
+
+Use short fictional purchasing, incident, inventory and approval policies. Sign in, upload and wait for ready status; verify actual vectors, collection identity, hybrid retrieval, cited passages and source inspector. Include answerable, absent, related-but-insufficient, contradictory, multi-passage and injection cases. For DO, inspect the proposal, reject one and approve a separate request, then check the ticket and audit record. Cross-workspace/requester and transaction-failure tests are mandatory regardless of the model.
+
+Three reproducible commands answer different questions:
+
+```bash
+# From backend, with the local profile active; run sequentially:
+python -m app.evaluate_grounding
+# Explicit model assessment of fixed passages, without retrieval/embedding evaluation:
+python -m app.evaluate_grounding --live
+# Full HTTP-handler/real-database/model pipeline on a NEW EMPTY dedicated DB:
+# Set DATABASE_URL privately to a database ending in _local or _eval first.
+python -m app.evaluate_local --live \
+  --output evals/local-live-results.json \
+  --credentials-file /tmp/mazmi-local-browser-credentials.json
+```
+
+The full evaluator requires development mode, demo disabled, both providers Ollama and an empty dedicated database. It refuses existing records **before migration**, preserves the resulting fictional database for inspection and never resets it. Re-running needs another new dedicated database. The optional credentials file must be new and outside Git; it is created with mode 0600 for later browser login. Do not publish, screenshot or paste it. The public JSON contains fixture metrics, not the password. A nonzero exit/result must remain visible rather than relabelling a partial run as passing.
+
+The full corpus contains four fictional policies and eight questions, with tool/approval/audit and workspace checks in addition to retrieval. Its per-document Recall@6/MRR, known-source selection, abstentions and stage durations describe only that corpus and model configuration. Review the returned quotations manually: exact citation IDs do not prove applicability. The separate `python -m app.evaluate` SQL evaluator uses synthetic vectors; it is not the same measurement. Historical reports remain in `backend/evals`; [VALIDATION.md](VALIDATION.md) distinguishes offline policy guards, raw real-model smoke and full live pipeline evidence, retaining all known failures.
+
+## Optional local voice
+
+Faster-Whisper/Piper are independent of chat and are not required for this release. When resources allow, explicitly install `backend/requirements-voice.txt` into the existing virtualenv and prepare licensed models outside Git. Configure an absolute local CTranslate2 directory with `STT_MODEL_PATH`, and Piper `.onnx` plus adjacent `.onnx.json` with `PIPER_MODEL_PATH`. STT uses `local_files_only=True`; the application does not download weights by model name. Verify the voice license and optional `PIPER_EXECUTABLE` yourself.
+
+Browser recording requires localhost or HTTPS, permission and a supported format. Limits remain 60 seconds and 10 MB. Denied permission or absent models must leave text chat usable. Real microphone/TTS remains unverified unless the dated report explicitly says otherwise. Compose does not include voice extras or model mounts; Docker Desktop was not started in this session. Never expose Ollama or PostgreSQL directly to the Internet.
+
+References: [Ollama chat](https://docs.ollama.com/api/chat), [embeddings](https://docs.ollama.com/api/embed), [tools](https://docs.ollama.com/capabilities/tool-calling), [structured outputs](https://docs.ollama.com/capabilities/structured-outputs), [EmbeddingGemma model card](https://huggingface.co/google/embeddinggemma-300m), [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper), [Piper](https://github.com/OHF-Voice/piper1-gpl).

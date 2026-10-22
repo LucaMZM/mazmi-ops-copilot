@@ -66,8 +66,14 @@ def requested_tools(message: str, mode: str) -> list[dict]:
         return []
     if re.match(r"(?:por favor[, ]+)?(?:consulta|muestra|lista|busca|list|show|find)\b", text):
         return [READ_TOOL]
+    # A ticket mentioned somewhere in the sentence is not authorization to
+    # propose one: "Crea un resumen sobre tickets" requests a summary. Keep the
+    # write gate deliberately narrow and require the action's direct object.
     if mode == "DO" and re.match(
-        r"(?:por favor[, ]+)?(?:crea|crear|prepara|abre|registra|create|open)\b", text
+        r"(?:por favor[, ]+)?(?:crea|crear|prepara|abre|registra|create|open)\s+"
+        r"(?:(?:un|una|el|la|a|an|the)\s+)?(?:(?:nuevo|nueva|new)\s+)?"
+        r"(?:ticket|incidencia)\b",
+        text,
     ):
         return [WRITE_TOOL]
     return []
@@ -151,7 +157,12 @@ def answer(
         if len(calls) > 1:
             raise RuntimeError("Solo se admite una herramienta por paso")
         if not calls:
-            text = response.output_text or "No encuentro información suficiente para responder."
+            # A model's narration is not evidence of either proposal or execution.
+            # Only a validated function call below can create a pending action.
+            if any(tool["name"] == "create_ticket" for tool in allowed_tools):
+                text = "No se ha preparado ninguna acción. No se ha ejecutado nada."
+            else:
+                text = response.output_text or "No encuentro información suficiente para responder."
             break
         call = calls[0]
         if call.name not in {tool["name"] for tool in allowed_tools}:

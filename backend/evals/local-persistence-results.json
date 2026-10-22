@@ -1,0 +1,25 @@
+{
+  "mode": "post-run-read-only-database-observation",
+  "same_run_as": "local-live-results.json",
+  "audit_event_counts": {
+    "action.executed": 1,
+    "action.proposed": 2,
+    "action.rejected": 1,
+    "chat.completed": 10,
+    "document.indexed": 4
+  },
+  "proposal_status_counts": {
+    "EXECUTED": 1,
+    "REJECTED": 1
+  },
+  "ticket_count": 1,
+  "ready_document_count": 4,
+  "stored_vector_dimensions_and_counts": [
+    {
+      "dimensions": 768,
+      "count": 4
+    }
+  ],
+  "audit_counts_verified": true,
+  "limitation": "Independent read-only verification after real tool-read timeout. It does not turn the failed model journey into a pass; no model request retried and no fixture data changed."
+}

@@ -567,18 +567,51 @@ export function ActivityView({
   );
 }
 
+export function ProviderContext({ system }: { system: SystemInfo | null }) {
+  if (!system) return null;
+  const provider = system.generation;
+  const label = system.demo
+    ? "DEMO · IA simulada"
+    : provider.provider === "ollama"
+      ? provider.verification === "passed"
+        ? "Ollama · última prueba local completada"
+        : provider.verification === "failed"
+          ? "Ollama · última prueba local fallida"
+          : "Ollama · seleccionado, sin verificar"
+      : `${provider.provider === "gemini" ? "Gemini" : "OpenAI"} · ${
+          provider.state === "not_configured"
+            ? "sin API key configurada"
+            : "configurado, sin verificar"
+        }`;
+  return (
+    <div className="providerContext" aria-label="Proveedor de la consulta">
+      <span>{label}</span>
+      <code translate="no">{provider.model}</code>
+      {!system.demo && provider.checked_at && (
+        <time dateTime={provider.checked_at}>{date(provider.checked_at)}</time>
+      )}
+    </div>
+  );
+}
+
 export function SettingsView({
   system,
   workspace,
   onReload,
   onCreate,
   creating,
+  checkingLocal,
+  localCheckError,
+  onCheckLocal,
 }: {
   system: SystemInfo | null;
   workspace: string;
   onReload: () => void;
   onCreate: (name: string) => Promise<void>;
   creating: boolean;
+  checkingLocal: boolean;
+  localCheckError: string;
+  onCheckLocal: () => Promise<void>;
 }) {
   return (
     <div className="pageSection settingsPage">
@@ -592,7 +625,7 @@ export function SettingsView({
           </p>
         </div>
         <button onClick={onReload}>
-          <RefreshCw size={16} /> Actualizar estado
+          <RefreshCw size={16} aria-hidden="true" /> Actualizar estado
         </button>
       </div>
       {!system ? (
@@ -602,11 +635,11 @@ export function SettingsView({
       ) : (
         <>
           <div className="settingsNotice">
-            <Settings2 size={21} />
+            <Settings2 size={21} aria-hidden="true" />
             <p>
               {system.demo
                 ? "Modo demo: respuestas y vectores deterministas simulados. Ninguna conexión con Gemini."
-                : "Configurado no significa conectado. Esta vista no realiza peticiones al proveedor ni certifica una conexión real."}
+                : "Configurado no significa conectado. Actualizar estado solo lee la configuración; la prueba local se ejecuta cuando la solicitas."}
             </p>
           </div>
           {[
@@ -632,7 +665,7 @@ export function SettingsView({
                   <div>
                     <dt>Modelo</dt>
                     <dd>
-                      <code>{provider.model}</code>
+                      <code translate="no">{provider.model}</code>
                     </dd>
                   </div>
                   <div>
@@ -658,13 +691,78 @@ export function SettingsView({
                     <dd>
                       {provider.verification === "simulated"
                         ? "Probado con fixtures; sin conexión real"
-                        : "No verificada"}
+                        : provider.verification === "passed"
+                          ? "Última prueba local completada"
+                          : provider.verification === "failed"
+                            ? "Última prueba local fallida"
+                            : "No verificada"}
+                      {provider.checked_at && (
+                        <>
+                          <br />
+                          <time dateTime={provider.checked_at}>
+                            {date(provider.checked_at)}
+                          </time>
+                        </>
+                      )}
                     </dd>
                   </div>
                 </dl>
               </section>
             );
           })}
+          {!system.demo &&
+            system.generation.provider === "ollama" &&
+            system.embeddings.provider === "ollama" && (
+              <section className="settingSection">
+                <div>
+                  <h3>Prueba local de Ollama</h3>
+                  <p>
+                    Comprueba una respuesta estructurada y un embedding con texto
+                    ficticio. No envía tus documentos ni ejecuta herramientas.
+                  </p>
+                  <p>
+                    El resultado describe esa prueba, no una conexión permanente.
+                    Caduca a los 5 minutos o al cambiar la configuración.
+                  </p>
+                </div>
+                <div className="localCheckControls">
+                  <button
+                    onClick={() => void onCheckLocal()}
+                    disabled={checkingLocal}
+                    aria-busy={checkingLocal}
+                  >
+                    <RefreshCw size={16} aria-hidden="true" />
+                    {checkingLocal ? "Verificando Ollama…" : "Verificar Ollama"}
+                  </button>
+                  <div role="status" aria-live="polite">
+                    {checkingLocal ? (
+                      <p>
+                        Las dos pruebas pueden tardar varios minutos si los
+                        modelos están fríos. Puedes seguir usando el chat; no se
+                        reintentará automáticamente.
+                      </p>
+                    ) : system.local_check ? (
+                      <>
+                        <p>{system.local_check.message}</p>
+                        <p>
+                          <time dateTime={system.local_check.checked_at}>
+                            {date(system.local_check.checked_at)}
+                          </time>
+                        </p>
+                      </>
+                    ) : (
+                      <p>
+                        No se ha completado una prueba reciente con esta
+                        configuración.
+                      </p>
+                    )}
+                  </div>
+                  {localCheckError && (
+                    <p role="alert" className="errorText">{localCheckError}</p>
+                  )}
+                </div>
+              </section>
+            )}
           <section className="settingSection">
             <div>
               <h3>Indexación y colecciones</h3>
@@ -679,7 +777,11 @@ export function SettingsView({
                 <dd>{system.embeddings.dimensions}</dd>
               </div>
               <div>
-                <dt>Colección activa</dt>
+                <dt>
+                  {system.embeddings.provider === "ollama" && !system.demo
+                    ? "Colección de última prueba"
+                    : "Colección activa"}
+                </dt>
                 <dd>
                   <code>
                     {system.embeddings.collection ??

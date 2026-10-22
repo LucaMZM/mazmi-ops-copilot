@@ -1,0 +1,36 @@
+{
+  "mode": "real-local-transport-and-historical-product-observations",
+  "observed_product_timeout": {
+    "operation": "ASK get_tickets journey",
+    "method": "POST",
+    "route": "/api/chat",
+    "http_status": 503,
+    "duration_ms": 120188,
+    "source": "coordinator HTTP evaluation log; same run as local-live-results.json",
+    "classification": "controlled failure, not a passing read-tool journey"
+  },
+  "later_recovery_probe": {
+    "status": "expired",
+    "source": "successful browser capture ollama-settings.jpg; process cache expires after 300 seconds"
+  },
+  "stream_close_recovery": "see ollama-cancellation-results.json; HTTP transport close, immediate GPU cancellation not measured",
+  "limitations": [
+    "No daemon termination or other project service changes.",
+    "The timeout is a real failed product request, not an artificial injected delay.",
+    "Recovery fixture success does not repair the failing RAG/agent acceptance gate."
+  ],
+  "unavailable_endpoint": {
+    "status": "passed",
+    "exception": "ProviderUnavailable",
+    "duration_ms": 5054.56,
+    "transport_error_type": "ConnectTimeout",
+    "method": "real unavailable TCP endpoint on reserved non-listening loopback port; no daemon interruption"
+  },
+  "historical_recovery_after_timeout": {
+    "status": "passed",
+    "checked_at": "2026-10-22T18:11:42.477048+00:00",
+    "scope": "structured-output-and-embedding-fixtures",
+    "duration_ms": 20664.95,
+    "source": "authenticated /api/system response recorded after browser manual check; now expired as expected"
+  }
+}

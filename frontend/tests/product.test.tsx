@@ -454,3 +454,166 @@ test("a failed document inspector explains the absence of chunks", async () => {
   await screen.findByText("Sin fragmentos conservados");
   expect(screen.queryByText("Siguiente")).not.toBeInTheDocument();
 });
+
+const ollamaSystem: SystemInfo = {
+  ...system,
+  generation: {
+    provider: "ollama",
+    model: "qwen3:4b",
+    state: "configured",
+    verification: "not_checked",
+  },
+  embeddings: {
+    provider: "ollama",
+    model: "embeddinggemma",
+    state: "configured",
+    verification: "not_checked",
+    dimensions: 768,
+    collection: null,
+  },
+};
+const checkedOllama: SystemInfo = {
+  ...ollamaSystem,
+  generation: {
+    ...ollamaSystem.generation,
+    verification: "passed",
+    checked_at: "2026-10-22T12:00:00Z",
+  },
+  embeddings: {
+    ...ollamaSystem.embeddings,
+    verification: "passed",
+    checked_at: "2026-10-22T12:00:00Z",
+    collection: "ollama:embeddinggemma:768:test-digest",
+  },
+  local_check: {
+    status: "passed",
+    checked_at: "2026-10-22T12:00:00Z",
+    scope: "structured-output-and-embedding-fixtures",
+    duration_ms: 100,
+    message: "Prueba local completada con texto ficticio.",
+  },
+};
+
+test("Ollama verification is manual, single-flight and does not block the chat", async () => {
+  let complete!: (response: Response) => void;
+  const fetcher = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+    String(input) === "/api/system/check-local"
+      ? new Promise<Response>((resolve) => { complete = resolve; })
+      : Response.json(String(input) === "/api/system" ? ollamaSystem : fetchBase(String(input))),
+  );
+  mount();
+  nav("Configuración");
+  const verify = await screen.findByRole("button", { name: "Verificar Ollama" });
+  expect(fetcher.mock.calls.some(([url]) => String(url).endsWith("/check-local"))).toBe(false);
+  fireEvent.click(verify);
+  fireEvent.click(verify);
+  expect(screen.getByRole("button", { name: "Verificando Ollama…" })).toBeDisabled();
+  expect(screen.getByText(/Las dos pruebas pueden tardar/)).toBeInTheDocument();
+  expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith("/check-local"))).toHaveLength(1);
+  expect(fetcher.mock.calls.find(([url]) => String(url).endsWith("/check-local"))?.[1]?.method).toBe("POST");
+  nav("Copilot");
+  expect(screen.getByLabelText("Mensaje al copiloto")).toBeEnabled();
+  expect(screen.getByLabelText("Proveedor de la consulta")).toHaveTextContent("Ollama · seleccionado, sin verificar");
+  complete(Response.json(checkedOllama));
+  await waitFor(() => expect(screen.getByLabelText("Proveedor de la consulta")).toHaveTextContent("última prueba local completada"));
+  expect(screen.getByLabelText("Proveedor de la consulta").querySelector("time")).toHaveAttribute("datetime", "2026-10-22T12:00:00Z");
+  expect(screen.queryByText(/Conectado/)).not.toBeInTheDocument();
+});
+
+test.each<[string, SystemInfo]>([
+  ["Gemini", system],
+  ["demo", { ...ollamaSystem, demo: true }],
+  ["mixed providers", { ...ollamaSystem, embeddings: system.embeddings }],
+])("%s never offers or runs a local Ollama probe", async (_label, config) => {
+  const fetcher = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+    Response.json(String(input) === "/api/system" ? config : fetchBase(String(input))),
+  );
+  mount();
+  nav("Configuración");
+  await screen.findByText(config.generation.model);
+  expect(screen.queryByRole("button", { name: "Verificar Ollama" })).not.toBeInTheDocument();
+  expect(fetcher.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+});
+
+test("local verification failures stay actionable and never claim a connection", async () => {
+  const fetcher = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+    String(input) === "/api/system/check-local"
+      ? Response.json({ detail: "Ya hay una prueba local en curso." }, { status: 409 })
+      : Response.json(String(input) === "/api/system" ? ollamaSystem : fetchBase(String(input))),
+  );
+  mount();
+  nav("Configuración");
+  fireEvent.click(await screen.findByRole("button", { name: "Verificar Ollama" }));
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Ya hay una prueba local en curso."));
+  expect(screen.getByRole("alert")).toHaveTextContent("actualiza el estado antes de repetir");
+  expect(screen.getByRole("button", { name: "Verificar Ollama" })).toBeEnabled();
+  expect(screen.getAllByText("No verificada")).toHaveLength(2);
+  expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith("/check-local"))).toHaveLength(1);
+});
+
+test("a completed negative fixture check displays failure and no verified collection", async () => {
+  const failed: SystemInfo = {
+    ...ollamaSystem,
+    generation: { ...ollamaSystem.generation, verification: "failed" },
+    embeddings: { ...ollamaSystem.embeddings, verification: "failed" },
+    local_check: { ...checkedOllama.local_check!, status: "failed", message: "Comprueba el servicio, los modelos y sus dimensiones." },
+  };
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+    Response.json(String(input) === "/api/system/check-local" ? failed : String(input) === "/api/system" ? ollamaSystem : fetchBase(String(input))),
+  );
+  mount();
+  nav("Configuración");
+  fireEvent.click(await screen.findByRole("button", { name: "Verificar Ollama" }));
+  await screen.findByText("Comprueba el servicio, los modelos y sus dimensiones.");
+  expect(screen.getAllByText("Última prueba local fallida")).toHaveLength(2);
+  expect(screen.getByText("Pendiente de verificar el digest Ollama")).toBeInTheDocument();
+  nav("Copilot");
+  expect(screen.getByLabelText("Proveedor de la consulta")).toHaveTextContent("Ollama · última prueba local fallida");
+});
+
+test("a stale local result cannot overwrite a freshly loaded provider configuration", async () => {
+  let complete!: (response: Response) => void;
+  let config = ollamaSystem;
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+    String(input) === "/api/system/check-local"
+      ? new Promise<Response>((resolve) => { complete = resolve; })
+      : Response.json(String(input) === "/api/system" ? config : fetchBase(String(input))),
+  );
+  mount();
+  nav("Configuración");
+  fireEvent.click(await screen.findByRole("button", { name: "Verificar Ollama" }));
+  config = system;
+  fireEvent.click(screen.getByRole("button", { name: "Actualizar estado" }));
+  await screen.findByText("gemini-test");
+  complete(Response.json(checkedOllama));
+  await waitFor(() => expect(screen.queryByText("qwen3:4b")).not.toBeInTheDocument());
+  nav("Copilot");
+  expect(screen.getByLabelText("Proveedor de la consulta")).toHaveTextContent("Gemini · sin API key configurada");
+});
+
+test("demo chat labels simulation rather than a real local model", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+    Response.json(String(input) === "/api/system" ? { ...ollamaSystem, demo: true } : fetchBase(String(input))),
+  );
+  mount();
+  await screen.findByText("DEMO DE DESARROLLO");
+  nav("Copilot");
+  expect(screen.getByLabelText("Proveedor de la consulta")).toHaveTextContent("DEMO · IA simulada");
+  expect(screen.getByLabelText("Proveedor de la consulta")).not.toHaveTextContent("prueba local completada");
+});
+
+test("local verification timeout does not retry and explains that the backend may continue", async () => {
+  const timeout = new Error("Timed out");
+  timeout.name = "TimeoutError";
+  const fetcher = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    if (String(input) === "/api/system/check-local") throw timeout;
+    return Response.json(String(input) === "/api/system" ? ollamaSystem : fetchBase(String(input)));
+  });
+  mount();
+  nav("Configuración");
+  fireEvent.click(await screen.findByRole("button", { name: "Verificar Ollama" }));
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("el backend puede seguir procesándola"));
+  expect(screen.getByRole("alert")).toHaveTextContent("Actualiza el estado antes de volver a verificar");
+  expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith("/check-local"))).toHaveLength(1);
+  expect(screen.getByRole("button", { name: "Verificar Ollama" })).toBeEnabled();
+});

@@ -1,0 +1,267 @@
+{
+  "mode": "live-ollama-http-pipeline-real-postgresql",
+  "created_at_utc": "2026-10-22T18:10:56.258137+00:00",
+  "generation_model": "qwen3:4b",
+  "embedding_model": "embeddinggemma",
+  "embedding_dimensions": 768,
+  "embedding_collection": "ollama:embeddinggemma:768:85462619ee721b466c5927d109d4cb765861907d5417b9109caebc4e614679f1:retrieval-prefix-v1",
+  "fixtures": "local_cases.json; four fictitious documents / eight questions",
+  "ingestion": [
+    {
+      "fixture": "compras-ficticias.txt",
+      "http_status": 200,
+      "ready": true,
+      "duration_ms": 1764.77
+    },
+    {
+      "fixture": "incidencias-ficticias.txt",
+      "http_status": 200,
+      "ready": true,
+      "duration_ms": 939.13
+    },
+    {
+      "fixture": "inventario-ficticio.txt",
+      "http_status": 200,
+      "ready": true,
+      "duration_ms": 940.88
+    },
+    {
+      "fixture": "aprobaciones-ficticias.txt",
+      "http_status": 200,
+      "ready": true,
+      "duration_ms": 925.56
+    }
+  ],
+  "cases": [
+    {
+      "name": "known_purchase_limit",
+      "expected_abstention": false,
+      "duration_ms": 85072.19,
+      "abstained": true,
+      "abstention_reason": "incomplete_evidence_assessment",
+      "evidence_policy": "extractive_v3",
+      "citation_ids_valid": true,
+      "citation_count": 0,
+      "retrieved_documents": [
+        "compras-ficticias.txt",
+        "aprobaciones-ficticias.txt",
+        "incidencias-ficticias.txt"
+      ],
+      "cited_documents": [],
+      "retrieval_ms": 898,
+      "retrieval_strategy": "hybrid_rrf_v1",
+      "vector_candidates": 3,
+      "lexical_candidates": 1,
+      "unexpected_proposal": false,
+      "document_recall_at_6": 1.0,
+      "document_reciprocal_rank": 1.0,
+      "all_expected_documents_cited": false,
+      "unexpected_documents_cited": []
+    },
+    {
+      "name": "exact_procedure_identifier",
+      "expected_abstention": false,
+      "duration_ms": 27699.81,
+      "abstained": false,
+      "abstention_reason": null,
+      "evidence_policy": "extractive_v3",
+      "citation_ids_valid": true,
+      "citation_count": 1,
+      "retrieved_documents": [
+        "incidencias-ficticias.txt"
+      ],
+      "cited_documents": [
+        "incidencias-ficticias.txt"
+      ],
+      "retrieval_ms": 1994,
+      "retrieval_strategy": "hybrid_rrf_v1",
+      "vector_candidates": 1,
+      "lexical_candidates": 0,
+      "unexpected_proposal": false,
+      "document_recall_at_6": 1.0,
+      "document_reciprocal_rank": 1.0,
+      "all_expected_documents_cited": true,
+      "unexpected_documents_cited": []
+    },
+    {
+      "name": "workspace_inventory_scope",
+      "expected_abstention": false,
+      "duration_ms": 22662.22,
+      "abstained": false,
+      "abstention_reason": null,
+      "evidence_policy": "extractive_v3",
+      "citation_ids_valid": true,
+      "citation_count": 1,
+      "retrieved_documents": [
+        "inventario-ficticio.txt"
+      ],
+      "cited_documents": [
+        "inventario-ficticio.txt"
+      ],
+      "retrieval_ms": 1432,
+      "retrieval_strategy": "hybrid_rrf_v1",
+      "vector_candidates": 1,
+      "lexical_candidates": 0,
+      "unexpected_proposal": false,
+      "document_recall_at_6": 1.0,
+      "document_reciprocal_rank": 1.0,
+      "all_expected_documents_cited": true,
+      "unexpected_documents_cited": []
+    },
+    {
+      "name": "multipart_purchase_approval_audit",
+      "expected_abstention": false,
+      "duration_ms": 104517.85,
+      "abstained": true,
+      "abstention_reason": "incomplete_evidence_assessment",
+      "evidence_policy": "extractive_v3",
+      "citation_ids_valid": true,
+      "citation_count": 0,
+      "retrieved_documents": [
+        "aprobaciones-ficticias.txt",
+        "compras-ficticias.txt"
+      ],
+      "cited_documents": [],
+      "retrieval_ms": 1730,
+      "retrieval_strategy": "hybrid_rrf_v1",
+      "vector_candidates": 2,
+      "lexical_candidates": 0,
+      "unexpected_proposal": false,
+      "document_recall_at_6": 1.0,
+      "document_reciprocal_rank": 1.0,
+      "all_expected_documents_cited": false,
+      "unexpected_documents_cited": []
+    },
+    {
+      "name": "no_salary_policy",
+      "expected_abstention": true,
+      "duration_ms": 1467.28,
+      "abstained": true,
+      "abstention_reason": "missing_fact_relation",
+      "evidence_policy": "extractive_v3",
+      "citation_ids_valid": true,
+      "citation_count": 0,
+      "retrieved_documents": [
+        "compras-ficticias.txt"
+      ],
+      "cited_documents": [],
+      "retrieval_ms": 1445,
+      "retrieval_strategy": "hybrid_rrf_v1",
+      "vector_candidates": 1,
+      "lexical_candidates": 0,
+      "unexpected_proposal": false,
+      "document_recall_at_6": null,
+      "document_reciprocal_rank": null,
+      "all_expected_documents_cited": null,
+      "unexpected_documents_cited": []
+    },
+    {
+      "name": "missing_inventory_location",
+      "expected_abstention": true,
+      "duration_ms": 902.56,
+      "abstained": true,
+      "abstention_reason": "missing_question_scope",
+      "evidence_policy": "extractive_v3",
+      "citation_ids_valid": true,
+      "citation_count": 0,
+      "retrieved_documents": [
+        "inventario-ficticio.txt",
+        "incidencias-ficticias.txt"
+      ],
+      "cited_documents": [],
+      "retrieval_ms": 886,
+      "retrieval_strategy": "hybrid_rrf_v1",
+      "vector_candidates": 2,
+      "lexical_candidates": 0,
+      "unexpected_proposal": false,
+      "document_recall_at_6": null,
+      "document_reciprocal_rank": null,
+      "all_expected_documents_cited": null,
+      "unexpected_documents_cited": []
+    },
+    {
+      "name": "related_but_missing_delivery_sla",
+      "expected_abstention": true,
+      "duration_ms": 52168.48,
+      "abstained": true,
+      "abstention_reason": "insufficient_evidence",
+      "evidence_policy": "extractive_v3",
+      "citation_ids_valid": true,
+      "citation_count": 0,
+      "retrieved_documents": [
+        "aprobaciones-ficticias.txt",
+        "compras-ficticias.txt"
+      ],
+      "cited_documents": [],
+      "retrieval_ms": 889,
+      "retrieval_strategy": "hybrid_rrf_v1",
+      "vector_candidates": 2,
+      "lexical_candidates": 0,
+      "unexpected_proposal": false,
+      "document_recall_at_6": null,
+      "document_reciprocal_rank": null,
+      "all_expected_documents_cited": null,
+      "unexpected_documents_cited": []
+    },
+    {
+      "name": "missing_person_identity",
+      "expected_abstention": true,
+      "duration_ms": 39150.23,
+      "abstained": true,
+      "abstention_reason": "insufficient_evidence",
+      "evidence_policy": "extractive_v3",
+      "citation_ids_valid": true,
+      "citation_count": 0,
+      "retrieved_documents": [
+        "compras-ficticias.txt",
+        "aprobaciones-ficticias.txt"
+      ],
+      "cited_documents": [],
+      "retrieval_ms": 1714,
+      "retrieval_strategy": "hybrid_rrf_v1",
+      "vector_candidates": 2,
+      "lexical_candidates": 0,
+      "unexpected_proposal": false,
+      "document_recall_at_6": null,
+      "document_reciprocal_rank": null,
+      "all_expected_documents_cited": null,
+      "unexpected_documents_cited": []
+    }
+  ],
+  "summary": {
+    "attempted_questions": 8,
+    "completed_questions": 8,
+    "http_errors": 0,
+    "answerable_cases": 4,
+    "unanswerable_cases": 4,
+    "correct_abstentions": 4,
+    "false_abstentions": 2,
+    "mean_document_recall_at_6": 1.0,
+    "document_mrr": 1.0,
+    "answerable_cases_with_all_gold_documents_cited": 2,
+    "all_returned_citation_ids_valid": true,
+    "mean_retrieval_ms_including_embedding": 1373.5
+  },
+  "journey_checks": {
+    "registration_and_login": true,
+    "all_four_documents_indexed": true,
+    "ask_never_mutated": true,
+    "empty_workspace_no_sources_or_action": true,
+    "empty_workspace_no_documents_or_activity_leak": true,
+    "do_proposal_before_execution": true,
+    "foreign_workspace_cannot_approve": true,
+    "foreign_workspace_cannot_read_documents": true,
+    "foreign_requester_cannot_approve": true,
+    "approval_executes_once": true,
+    "rejection_never_executes": true,
+    "journey_completed_without_http_errors": false
+  },
+  "limitations": [
+    "Gold document coverage and citation validity do not prove semantic entailment or full answer correctness.",
+    "Abstention labels are controlled fixture expectations, not general model accuracy.",
+    "Recall/MRR are document-level on answerable fixtures, K=6 chunks; latency includes query embedding.",
+    "No baseline model comparison, no cloud provider, no mocks, no voice or browser timing measured.",
+    "Only newly created fictitious records are used; database retained, never reset or cleaned automatically."
+  ],
+  "automated_fixture_checks_passed": false
+}

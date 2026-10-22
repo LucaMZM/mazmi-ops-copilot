@@ -50,12 +50,20 @@ export type ProviderInfo = {
   provider: string;
   model: string;
   state: "configured" | "not_configured" | "demo";
-  verification: "not_checked" | "simulated";
+  verification: "not_checked" | "simulated" | "passed" | "failed";
+  checked_at?: string;
 };
 export type SystemInfo = {
   demo: boolean;
   generation: ProviderInfo;
   embeddings: ProviderInfo & { dimensions: number; collection: string | null };
+  local_check?: {
+    status: "passed" | "failed";
+    checked_at: string;
+    scope: "structured-output-and-embedding-fixtures";
+    duration_ms: number | null;
+    message: string;
+  };
   voice: {
     stt: string;
     tts: string;

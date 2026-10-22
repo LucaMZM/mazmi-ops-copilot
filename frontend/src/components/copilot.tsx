@@ -47,9 +47,21 @@ import {
   ApprovalsView,
   ActivityView,
   SettingsView,
+  ProviderContext,
 } from "./product-views";
 
 const API = "";
+const providerConfiguration = (config: SystemInfo | null) =>
+  config
+    ? JSON.stringify([
+        config.demo,
+        config.generation.provider,
+        config.generation.model,
+        config.embeddings.provider,
+        config.embeddings.model,
+        config.embeddings.dimensions,
+      ])
+    : "";
 const errorMessage = (error: unknown) => {
   const value =
     typeof error === "object" && error !== null
@@ -90,6 +102,9 @@ export function Copilot({
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [system, setSystem] = useState<SystemInfo | null>(null);
+  const [checkingLocal, setCheckingLocal] = useState(false);
+  const [localCheckError, setLocalCheckError] = useState("");
+  const localCheckRequest = useRef(false);
   const [actions, setActions] = useState<PendingAction[]>([]);
   const [viewBusy, setViewBusy] = useState(false);
   const viewRequest = useRef(0);
@@ -216,6 +231,45 @@ export function Copilot({
       setError(errorMessage(err));
     } finally {
       if (viewRequest.current === version) setViewBusy(false);
+    }
+  }
+  async function checkLocalProvider() {
+    if (
+      localCheckRequest.current ||
+      !system ||
+      system.demo ||
+      system.generation.provider !== "ollama" ||
+      system.embeddings.provider !== "ollama"
+    )
+      return;
+    const startedConfiguration = providerConfiguration(system);
+    localCheckRequest.current = true;
+    setCheckingLocal(true);
+    setLocalCheckError("");
+    try {
+      const checked = await request<SystemInfo>("/api/system/check-local", {
+        method: "POST",
+        signal: AbortSignal.timeout(300_000),
+      });
+      if (mountedRef.current && checked.generation) {
+        setSystem((current) =>
+          providerConfiguration(current) === startedConfiguration
+            ? checked
+            : current,
+        );
+      }
+    } catch (err) {
+      if (mountedRef.current) {
+        const timedOut = err instanceof Error && err.name === "TimeoutError";
+        setLocalCheckError(
+          timedOut
+            ? "La espera de la prueba ha terminado; el backend puede seguir procesándola. Actualiza el estado antes de volver a verificar."
+            : `${errorMessage(err)} Comprueba el servicio Ollama y los modelos; actualiza el estado antes de repetir la prueba.`,
+        );
+      }
+    } finally {
+      localCheckRequest.current = false;
+      if (mountedRef.current) setCheckingLocal(false);
     }
   }
   async function openConversation(id: string) {
@@ -941,10 +995,14 @@ export function Copilot({
               onCreate={createWorkspace}
               creating={creatingWorkspace}
               onReload={() => changeView("Settings")}
+              checkingLocal={checkingLocal}
+              localCheckError={localCheckError}
+              onCheckLocal={checkLocalProvider}
             />
           )}
           {view === "Copilot" && (
             <div className="chatCanvas">
+              <ProviderContext system={system} />
               {!messages.length && (
                 <div className="chatWelcome">
                   <span className="eyebrow">MAZMI / COPILOT</span>
@@ -971,7 +1029,7 @@ export function Copilot({
                   </div>
                   {system?.generation.state === "not_configured" && (
                     <p className="setupHint">
-                      Gemini todavía no está configurado. Consulta Configuración
+                      El proveedor seleccionado todavía no está configurado. Consulta Configuración
                       o utiliza el modo demo de desarrollo.
                     </p>
                   )}

@@ -153,6 +153,22 @@ def system_status(user: CurrentUser):
     return configuration()
 
 
+@app.post("/api/system/check-local")
+def verify_local_provider(user: CurrentUser):
+    """Explicit local fixture inference. Never invoked by a settings GET."""
+    from .runtime import LocalCheckBusy, configuration, verify_local
+
+    try:
+        verify_local()
+    except LocalCheckBusy as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        raise provider_error(exc) from exc
+    return configuration()
+
+
 @app.get("/api/documents/{document_id}/chunks")
 def document_chunks(document_id: UUID, user: CurrentUser, offset: int = Query(0, ge=0)):
     with get_conn() as conn:
@@ -502,7 +518,9 @@ def run_chat(
             )
             meta.update(
                 {
-                    "generation_provider": "demo" if settings.demo_mode else settings.generation_provider,
+                    "generation_provider": "demo"
+                    if settings.demo_mode
+                    else settings.generation_provider,
                     "retrieval_ms": retrieval_ms,
                     "retrieval": retrieval_meta,
                     "retrieved_chunks": len(sources),
@@ -520,9 +538,17 @@ def run_chat(
 
         pending_action = None
         if pending:
-            if payload.mode != "DO" or pending["name"] != "create_ticket":
+            if (
+                payload.mode != "DO"
+                or pending.get("name") != "create_ticket"
+                or "create_ticket"
+                not in {tool["name"] for tool in requested_tools(payload.message, payload.mode)}
+            ):
                 raise HTTPException(502, "Propuesta de acción no permitida")
-            pending["payload"] = TicketPayload.model_validate(pending["payload"]).model_dump()
+            try:
+                pending["payload"] = TicketPayload.model_validate(pending["payload"]).model_dump()
+            except (ValidationError, KeyError, TypeError) as exc:
+                raise HTTPException(502, "Propuesta de acción no válida") from exc
             action_id = str(
                 conn.execute(
                     "INSERT INTO pending_actions(workspace_id,conversation_id,action_name,payload,requested_by) VALUES (%s,%s,%s,%s::jsonb,%s) RETURNING id",

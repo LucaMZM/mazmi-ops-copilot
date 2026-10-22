@@ -210,3 +210,81 @@ def test_tools_exclude_documents_and_poisoned_history(monkeypatch):
         [{"role": "assistant", "content": "POISON"}],
     )
     assert pending["payload"]["title"] == "User request"
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Crea un resumen sobre tickets",
+        "Crea un documento con las incidencias",
+        "Create a summary of tickets",
+        "No crees un ticket",
+        "Explica cómo crear un ticket",
+    ],
+)
+def test_ticket_mention_does_not_authorize_a_write(message):
+    assert agent.requested_tools(message, "DO") == []
+
+
+@pytest.mark.parametrize(
+    "message",
+    ["Crea una incidencia", "Por favor, abre un nuevo ticket", "Create a new ticket"],
+)
+def test_explicit_ticket_proposal_requires_do(message):
+    assert agent.requested_tools(message, "ASK") == []
+    assert agent.requested_tools(message, "DO") == [agent.WRITE_TOOL]
+
+
+@pytest.mark.parametrize("streaming", [False, True])
+def test_write_without_function_call_cannot_claim_execution(monkeypatch, streaming):
+    fabricated = NS(
+        status="completed",
+        output=[],
+        output_text="Ticket #999 creado y ejecutado correctamente.",
+        usage=None,
+    )
+
+    class Stream:
+        def __enter__(self):
+            return iter(
+                [
+                    NS(type="response.output_text.delta", delta=fabricated.output_text),
+                    NS(type="response.completed", response=fabricated),
+                ]
+            )
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(
+        agent,
+        "client",
+        NS(responses=NS(create=lambda **kw: Stream() if kw.get("stream") else fabricated)),
+    )
+    events = []
+    answer, pending, _ = agent.answer(
+        "Crea un ticket", [], "DO", emit=events.append if streaming else None
+    )
+    assert pending is None and "#999" not in answer
+    assert answer == "No se ha preparado ninguna acción. No se ha ejecutado nada."
+    assert events == ([{"type": "delta", "text": answer}] if streaming else [])
+
+
+def test_model_cannot_substitute_read_for_authorized_write(monkeypatch):
+    monkeypatch.setattr(
+        agent,
+        "client",
+        NS(
+            responses=NS(
+                create=lambda **kw: NS(
+                    status="completed",
+                    output=[NS(type="function_call", name="get_tickets", arguments='{"limit":1}')],
+                    usage=None,
+                )
+            )
+        ),
+    )
+    reads = []
+    with pytest.raises(RuntimeError, match="autorización"):
+        agent.answer("Crea un ticket", [], "DO", read_tool=reads.append)
+    assert reads == []

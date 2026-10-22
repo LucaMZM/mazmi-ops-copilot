@@ -51,12 +51,27 @@ class Ollama:
         try:
             with httpx.Client(
                 base_url=settings.ollama_base_url,
-                timeout=120,
+                timeout=httpx.Timeout(settings.ollama_timeout_seconds, connect=5, write=30, pool=5),
                 transport=self.transport,
                 trust_env=False,
             ) as client:
                 yield client
-        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+        except httpx.TimeoutException as exc:
+            raise ProviderUnavailable(
+                "Ollama agotó el tiempo de espera; no se cambió de proveedor."
+            ) from exc
+        except httpx.ConnectError as exc:
+            raise ProviderUnavailable(
+                "No se puede conectar con Ollama. Inicia el servicio local."
+            ) from exc
+        except httpx.HTTPStatusError as exc:
+            message = (
+                "Modelo no instalado en Ollama; no se descargó automáticamente."
+                if exc.response.status_code == 404
+                else "Ollama rechazó la petición; comprueba modelos, contexto y memoria disponible."
+            )
+            raise ProviderUnavailable(message) from exc
+        except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError) as exc:
             raise ProviderUnavailable(
                 "Ollama no disponible o respuesta incompatible. Comprueba servicio y modelos instalados."
             ) from exc
@@ -122,12 +137,17 @@ class Ollama:
         payload = {
             "model": kwargs["model"],
             "messages": messages,
-            "think": False,
+            # False is not supported by every thinking model (including the
+            # installed Qwen3 manifest). Let Ollama separate reasoning using its
+            # model default; never forward message.thinking to application text.
+            "think": None,
             "stream": bool(kwargs.get("stream")),
             "keep_alive": 0,
             "options": {
-                "temperature": 0,
-                "num_ctx": 8192,
+                # Preserve model sampling defaults: Qwen3 explicitly warns that
+                # greedy decoding can cause endless reasoning repetitions.
+                "seed": 42,
+                "num_ctx": settings.ollama_num_ctx,
                 "num_predict": kwargs.get("max_output_tokens", 2000),
             },
             "tools": [
@@ -143,21 +163,38 @@ class Ollama:
         return payload
 
     def result(self, data, content=None, calls=None):
+        if not isinstance(data, dict):
+            raise ProviderUnavailable("Respuesta Ollama incompatible")
         if "error" in data:
             raise ProviderUnavailable(
                 "Ollama devolvió un error; no se ejecutó ninguna herramienta."
             )
-        message = data.get("message", {})
+        message = data.get("message")
+        if not isinstance(message, dict):
+            raise ProviderUnavailable("Respuesta Ollama sin mensaje válido")
+        text = message.get("content", "") if content is None else content
+        tool_calls = calls if calls is not None else message.get("tool_calls", [])
+        if (
+            not isinstance(text, str)
+            or len(text) > 100000
+            or not isinstance(tool_calls, list)
+            or len(tool_calls) > 4
+        ):
+            raise ProviderUnavailable("Respuesta Ollama incompatible o demasiado grande")
         output = []
-        for item in calls if calls is not None else message.get("tool_calls", []):
+        for item in tool_calls:
             fn = item["function"]
-            if not isinstance(fn["arguments"], dict):
-                raise RuntimeError("Malformed tool arguments")
+            if (
+                not isinstance(fn["arguments"], dict)
+                or not isinstance(fn["name"], str)
+                or not fn["name"]
+            ):
+                raise ProviderUnavailable("Argumentos de herramienta Ollama incompatibles")
             output.append(
                 NS(
                     type="function_call",
                     name=fn["name"],
-                    arguments=json.dumps(fn["arguments"]),
+                    arguments=json.dumps(fn["arguments"], allow_nan=False),
                     call_id=uuid4().hex,
                 )
             )
@@ -166,7 +203,7 @@ class Ollama:
             if data.get("done") and data.get("done_reason", "stop") == "stop"
             else "incomplete",
             output=output,
-            output_text=message.get("content", "") if content is None else content,
+            output_text=text,
             usage=NS(
                 input_tokens=data.get("prompt_eval_count", 0),
                 output_tokens=data.get("eval_count", 0),
@@ -193,14 +230,21 @@ class Ollama:
                     if not line:
                         continue
                     data = json.loads(line)
+                    if not isinstance(data, dict):
+                        raise ProviderUnavailable("Evento de streaming Ollama incompatible")
                     if "error" in data:
                         raise ProviderUnavailable("Error durante streaming Ollama")
                     message = data.get("message", {})
+                    if not isinstance(message, dict):
+                        raise ProviderUnavailable("Mensaje de streaming Ollama incompatible")
                     delta = message.get("content", "")
+                    new_calls = message.get("tool_calls", [])
+                    if not isinstance(delta, str) or not isinstance(new_calls, list):
+                        raise ProviderUnavailable("Evento de streaming Ollama incompatible")
                     content += delta
-                    calls.extend(message.get("tool_calls", []))
+                    calls.extend(new_calls)
                     if len(content) > 100000 or len(calls) > 4:
-                        raise RuntimeError("Provider output limit exceeded")
+                        raise ProviderUnavailable("Respuesta Ollama demasiado grande")
                     if delta:
                         yield NS(type="response.output_text.delta", delta=delta)
                     if data.get("done"):
