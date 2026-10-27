@@ -1,3 +1,49 @@
+# Stabilization closure — 27 October 2026
+
+This checkpoint supersedes historical counts below. **Safe fixes are published; local RAG still blocks v1.0.0.** No production-readiness claim.
+
+## Delivered and verified
+
+- Ticket reads: exact, unfiltered requests use authorized backend routing with zero model calls. Other supported requests allow one validated function call; database rows never return to the model for narration. Strict limits 1–20, explicit numeric-count checks, typed bounded rows, workspace filtering and stable ordering remain server-owned. Only ID/title/priority/status are displayed as inert React text; descriptions are neither selected nor sent to the model. No-call narration cannot invent a database result. Committed approvals receive a deterministic receipt.
+- Evidence: added bounded Spanish conditional-premise and adjacent-reference guards, retaining model sufficiency, completed-response checks, strict JSON/IDs, extractive quotations and backend citations. The two old counterexamples now pass as normal regressions, with contrasted negative cases. These are narrow relation guards, not general entailment or conditional logic.
+- Incomplete/invalid assessments now report a verification failure, rather than claiming documents lack the answer. Ollama telemetry retains allowlisted counters/durations and content/thinking **lengths only**. `eval_count` includes thinking; no exact thinking-token split is claimed. No prompts, private reasoning or document bodies are logged by this telemetry.
+- Evaluation preserves every attempted case and separates technical failures from correct abstentions. Four deliberately corrupted mock decisions have explicit, different live semantic gold IDs; original mock expectations remain unchanged. Live results are not compared to frozen mocked model accuracy.
+
+## Actual checks
+
+**273 backend passed, 0 skipped, 0 xfailed** (final run 9.61 s), using provider doubles and real isolated PostgreSQL 17/pgvector. This includes authorization, workspace isolation, ASK/DO, invalid arguments, receipts, concurrent double approval, rollback, ingestion, collections and migration regressions. Ruff and pip check passed. **36 frontend passed**; TypeScript, ESLint and Next production build passed. Frontend source/layout and all eleven existing screenshots are unchanged; no new browser walkthrough or voice/cloud validation is claimed.
+
+Mocked grounding: same 27 fixtures, **21/21 correct negative abstentions, 0/6 false abstentions, 6/6 expected positive source selections**, compared with historical 20/21 negatives and 1/6 false abstentions. This measures backend safeguards with assessor doubles, not a general model-accuracy improvement. [Report](backend/evals/recovery-mock-grounding.json).
+
+## Real Ollama measurements
+
+Historical traced failures exhausted **2,000 generated tokens with zero final JSON characters**, `done_reason=length`, and 8,844/9,226 thinking characters (95.48/78.41 s model duration). These counters are [recovered from recorded session outputs](backend/evals/recovery-historical-trace.json); the original temporary trace files no longer exist. Two completed shorter-prompt/schema experiments also failed and were not repeated. Retrieval was not the cause of that JSON exhaustion.
+
+| Scope | Answerable correct | Negative correct | Technical failures | Decision |
+|---|---:|---:|---:|---|
+| Historical native-schema full RAG, 22 October | 2/4 | 4/4 | 2 incomplete assessments returned conservative responses | Native baseline retained |
+| Format-off diagnostic, expected documents only | 2/2 | — | 0 | Not retrieval or acceptance evidence |
+| Format-off candidate, full eight-question RAG | 3/4 | 3/4 | 2 HTTP timeouts | **Rejected; not activated in production** |
+| Independent fixed passages, production native schema | 2/2 | 2/2 | 0 | Small unseen corpus; not retrieval |
+
+The initial format-off diagnostic completed at 778/1,876 generated tokens and 54.78/85.16 s. It supplied only gold documents, so it does not isolate native grammar as the cause of the earlier full-context failures. Full retrieval exposed two timeouts: multipart purchase approval (122.25 s including retrieval) and missing person identity (123.76 s). The six completed cases have valid citations; the three completed positives cite every expected document. Their document Recall@6/MRR are 1.0, **measured over three completed positives**, not all four. Mean retrieval including embeddings is 1,474 ms across six completed cases. There were no observed unsupported returned answers, but two uncompleted cases cannot count as correct abstentions. [Diagnostic](backend/evals/recovery-format-off.json), [full candidate](backend/evals/recovery-local-results.json).
+
+The frozen four-case holdout was not used for tuning (SHA-256 `499091c9b8eef1ae96a7aae17532b38a5a54491c87624f39bb7d21bf7b3797a8`). Production native-schema assessment passed 4/4, plus 3/3 existing conditional/implicit/wrong-relation regressions. The implicit-reference case took **118.74 s**, close to the 120 s transport limit. Observed generation throughput in these calls varied from **8.73 to 25.76 tokens/s**. Thermal cause, peak memory and swap attribution were not measured. These observations do not justify increasing the token/context/timeout limits. [Holdout and regression results](backend/evals/recovery-holdout-results.json).
+
+Real ticket samples: historical read used two calls and 115.00 s; current exact read used **zero calls, 22.21 ms**, while an interpreted read used **one call, 23.48 s** (271 generated tokens). These are single controlled samples, not throughput guarantees. Real fixture journeys also verified proposal-before-write, requester/workspace rejection, approval once/409, rejection without execution and persisted audit. Four documents were ingested with real EmbeddingGemma 768-dimensional vectors. No real-company database was changed.
+
+## Recovery, reproducibility and release decision
+
+Interrupted changes were recovered from the persistent workspace, syntax-checked and saved in the canonical Desktop repository before publication. An early real run failed on filesystem reads (`Operation timed out`) and then a PostgreSQL connection timeout in the synchronized validation folder. It is recorded as an environment failure, not model evidence. Sources/results were preserved and validation environments recreated outside synchronized folders, without changing iCloud settings or deleting the failed cluster. [Failure record](backend/evals/recovery-runtime-failure.json). Future runtimes/databases should stay outside synchronized folders; reports/source belong in the project.
+
+Ollama 0.40.7 with installed Qwen3 4B still advertises thinking values `[true]`. Model default thinking, context 4096, output cap 2000 for evidence, timeout 120 s, seed 42 and `keep_alive=0` remain unchanged. One inference/model resident at a time; no downloads, Docker Desktop, paid requests or vendor keys. Native schema remains the production path. Separating reasoning/output budgets requires a compatible model/runtime; facet decomposition would add calls and needs whole-question applicability/conflict validation, so it was not shipped as an unproven workaround.
+
+Commits [d32e00e](https://github.com/LucaMZM/mazmi-ops-copilot/commit/d32e00ec1a15a594ee26515e5fa08641a256dfb7) and [ea03ae2](https://github.com/LucaMZM/mazmi-ops-copilot/commit/ea03ae23fa3eef351fc4aba7dd4c7dc6e7f3d52f) were pushed to main with successful [ticket CI](https://github.com/LucaMZM/mazmi-ops-copilot/actions/runs/40549814863) and [evidence CI](https://github.com/LucaMZM/mazmi-ops-copilot/actions/runs/40554058773). The final report/denominator follow-up is checked separately after push. Git metadata remains in the existing external Git directory. No secrets, credentials, databases, dependencies, models or private logs are included.
+
+**Decision: preliminary portfolio release; no v1.0.0 tag or GitHub Release.** Tickets are repaired, but Qwen3 4B completion/latency is not sufficiently reliable for the original acceptance corpus. A future model/runtime with controllable reasoning or faster hardware needs representative benchmarking before changing this decision. Cloud providers, real voice, production deployment and operational recovery remain outside this validation.
+
+---
+
 # Local-model engineering and publication — 22 October 2026
 
 This section supersedes older checkpoints below. **Code publication is accepted; the local-model `v1.0.0` gate is not.** The real eight-question evaluation exits 2 and retains its failures. No production readiness claim.

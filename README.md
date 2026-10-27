@@ -13,7 +13,7 @@ Built as a working portfolio project with a direct Python RAG pipeline, real Pos
 
 **Try it without an API key:** the [development demo](DEMO.md) uses clearly labelled deterministic fixtures. It runs the same authentication, document ingestion, hybrid retrieval, approvals and audit paths. It is not a Gemini quality demo or a publicly hosted service.
 
-> **Validation boundary:** Automated provider doubles, real PostgreSQL integration and real-model checks are reported separately in [VALIDATION.md](VALIDATION.md). Qwen3 4B and EmbeddingGemma now have real local capability and RAG measurements. The eight-question live RAG run retrieved every expected document but falsely abstained on two answerable questions; a ticket-read request timed out. These limits prevent a validated `v1.0.0` tag. Gemini, OpenAI and real voice remain unverified. This is a portfolio demonstration, not a production deployment.
+> **Validation boundary:** [Latest measured results](VALIDATION.md): 273 backend tests and 36 frontend tests pass. Ticket reads now use zero model calls for exact requests and at most one for interpreted requests, with deterministic database results. Production native-schema RAG retains conservative validation; an alternative completed 6/8 original cases but timed out twice and was rejected. An independent four-case native-schema corpus passed, with latency still close to timeout in a separate regression. These limits prevent a validated `v1.0.0` tag. Gemini, OpenAI and real voice remain unverified. This is a preliminary portfolio demonstration, not a production deployment.
 
 ## Product
 

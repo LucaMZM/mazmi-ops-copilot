@@ -1,0 +1,53 @@
+{
+  "provenance": "Historical 23 October session tool outputs recovered from the conversation; original temporary trace files were removed by restart. Not a new 27 October benchmark.",
+  "model": "qwen3:4b",
+  "native_schema": true,
+  "context": 4096,
+  "max_output_tokens": 2000,
+  "exact_thinking_token_count": "not exposed; eval_count includes generated thinking and final output",
+  "cases": [
+    {
+      "name": "known_purchase_limit",
+      "prompt_eval_count": 530,
+      "eval_count": 2000,
+      "done_reason": "length",
+      "content_chars": 0,
+      "thinking_chars": 8844,
+      "load_duration_ns": 14466847875,
+      "prompt_eval_duration_ns": 2917670000,
+      "eval_duration_ns": 77313893000,
+      "total_duration_ns": 95476402167
+    },
+    {
+      "name": "multipart_purchase_approval_audit",
+      "prompt_eval_count": 447,
+      "eval_count": 2000,
+      "done_reason": "length",
+      "content_chars": 0,
+      "thinking_chars": 9226,
+      "load_duration_ns": 3052603708,
+      "prompt_eval_duration_ns": 1744564000,
+      "eval_duration_ns": 73590165000,
+      "total_duration_ns": 78414398500
+    }
+  ],
+  "already_completed_experiments": [
+    {
+      "candidate": "shorter Spanish prompt, same schema",
+      "result": "both original failures still exhausted 2000 generated tokens before final JSON",
+      "approx_model_seconds": [
+        93.5,
+        80.1
+      ]
+    },
+    {
+      "candidate": "brief English prompt, explicit JSON example, schema annotations removed",
+      "result": "both original failures still exhausted 2000 generated tokens before final JSON",
+      "approx_model_seconds": [
+        85.3,
+        86.4
+      ]
+    }
+  ],
+  "do_not_repeat": "These failed prompt/schema experiments were not repeated on 27 October."
+}

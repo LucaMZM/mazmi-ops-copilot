@@ -153,10 +153,17 @@ def summarize(results):
         "attempted_questions": len(results),
         "completed_questions": len(complete),
         "http_errors": len(results) - len(complete),
-        "answerable_cases": len(positives),
-        "unanswerable_cases": len(negatives),
+        "answerable_cases": sum(not case["expected_abstention"] for case in results),
+        "unanswerable_cases": sum(case["expected_abstention"] for case in results),
+        "completed_answerable_cases": len(positives),
+        "completed_unanswerable_cases": len(negatives),
+        "retrieval_measured_answerable_cases": len(positives),
         "correct_abstentions": sum(classify_case(case) == "correct_abstention" for case in negatives),
         "false_abstentions": sum(case["abstained"] for case in positives),
+        "unanswered_answerable_cases": sum(
+            not case["expected_abstention"] and ("http_status" in case or case.get("abstained", False))
+            for case in results
+        ),
         "classification_counts": {
             label: sum(classify_case(case) == label for case in results)
             for label in ("correct", "correct_abstention", "false_abstention",

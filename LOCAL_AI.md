@@ -99,3 +99,38 @@ Faster-Whisper/Piper are independent of chat and are not required for this relea
 Browser recording requires localhost or HTTPS, permission and a supported format. Limits remain 60 seconds and 10 MB. Denied permission or absent models must leave text chat usable. Real microphone/TTS remains unverified unless the dated report explicitly says otherwise. Compose does not include voice extras or model mounts; Docker Desktop was not started in this session. Never expose Ollama or PostgreSQL directly to the Internet.
 
 References: [Ollama chat](https://docs.ollama.com/api/chat), [embeddings](https://docs.ollama.com/api/embed), [tools](https://docs.ollama.com/capabilities/tool-calling), [structured outputs](https://docs.ollama.com/capabilities/structured-outputs), [EmbeddingGemma model card](https://huggingface.co/google/embeddinggemma-300m), [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper), [Piper](https://github.com/OHF-Voice/piper1-gpl).
+
+
+## Stabilization results — 27 October 2026
+
+Exact unfiltered requests such as `Lista los últimos 3 tickets` or `Lista los tickets del workspace` now use the authenticated workspace directly, without generation or an API key. Other supported reads have at most one model decision and a deterministic database receipt. The numeric limit is validated (1–20), and a model cannot silently replace an explicit numeric count. Only ID/title/priority/status are returned. Additional filters are not implemented by the tool; interpreted results disclose that scope. Approval receipts also need no model call. Real samples were 22.21 ms / zero calls and 23.48 s / one call; these are not latency guarantees.
+
+The production RAG evaluator still uses native JSON Schema. A single bounded alternative removed native grammar while retaining the original semantic prompt, model, limits and strict backend validation. It passed two gold-only diagnostics, but the complete eight-question corpus produced three correct answers, three correct abstentions and two timeouts. It is **not enabled in the app**. Incomplete evaluations now display a verification-failure message instead of claiming the documentation lacks the answer.
+
+Reproduce fixed-passage checks with the existing local profile and an idle daemon:
+
+```bash
+# Native production path; no SQL/retrieval measured:
+python -m app.evaluate_grounding --live --dataset evals/recovery_holdout.json
+# Explicit diagnostic only; two public gold-passage cases:
+python -m app.diagnose_evidence --live --output evals/replayed-format-off.json
+```
+
+To reproduce the rejected full-pipeline candidate, first select a **new empty dedicated** `_local` or `_eval` database privately. This inserts fictional data and may take many minutes; do not point it at an existing application database. From `backend` with the Ollama profile active:
+
+```python
+import json
+from pathlib import Path
+from app import agent
+from app.diagnose_evidence import FormatOffDiagnostic
+from app.evaluate_local import run, fixture_checks_passed
+agent.client = FormatOffDiagnostic()  # This evaluator process only.
+report = run()
+report["generation_candidate"] = "diagnostic-native-format-off"
+report["automated_fixture_checks_passed"] = fixture_checks_passed(report)
+Path("evals/replayed-candidate.json").write_text(json.dumps(report, indent=2))
+```
+
+Keep native thinking (`think=null`), context 4096, evidence cap 2000, timeout 120 seconds and `keep_alive=0`. The installed preset advertises thinking `true` only. Generated-token counts include thinking; the adapter exposes safe numeric metrics and lengths, never private reasoning text. Observed throughput varied from 8.73 to 25.76 tokens/s; one supported implicit-reference assessment took 118.74 seconds. No token/context/timeout increase was validated.
+
+Keep virtualenvs, node_modules and PostgreSQL clusters **outside synchronized folders**. The first attempt hit filesystem read timeouts and a database connection timeout; the stable external runtime then completed 273 backend tests and the recorded real evaluations. Preserve source/results in the project, keep credentials/private database state outside Git, and follow [migration precautions](database/MIGRATIONS.md). No new migration or collection/reindexing change is required. [VALIDATION.md](VALIDATION.md) records the rejected candidate, native holdout, measured boundaries and release decision.

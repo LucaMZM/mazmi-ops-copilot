@@ -1,0 +1,223 @@
+{
+  "mode": "real-ollama-production-native-schema-fixed-passages",
+  "candidate_format_off": false,
+  "retrieval": "not measured: fixed public passages, no embeddings or SQL",
+  "holdout_sha256": "499091c9b8eef1ae96a7aae17532b38a5a54491c87624f39bb7d21bf7b3797a8",
+  "cases": [
+    {
+      "name": "onboarding_deadline",
+      "check": "independent_fixed_passages",
+      "expected_abstention": false,
+      "mock_expected_abstention": false,
+      "gold_label_mode": "fixture",
+      "gold_passage_ids": [
+        1
+      ],
+      "before_correct": true,
+      "after_correct": true,
+      "assessment_failed": false,
+      "abstained": false,
+      "reason": null,
+      "policy": "extractive_v4",
+      "model_assessment_performed": true,
+      "selected_passage_ids": [
+        1
+      ],
+      "citation_ids_valid": true,
+      "gold_source_selection_correct": true,
+      "duration_ms": 29108.23,
+      "provider_metrics": {
+        "prompt_eval_count": 285,
+        "eval_count": 599,
+        "total_duration": 28903007417,
+        "load_duration": 4438024417,
+        "prompt_eval_duration": 1144996000,
+        "eval_duration": 23255968000,
+        "done_reason": "stop",
+        "content_chars": 44,
+        "thinking_chars": 2636
+      },
+      "group": "independent",
+      "classification": "correct"
+    },
+    {
+      "name": "travel_approval_and_archive",
+      "check": "independent_fixed_passages",
+      "expected_abstention": false,
+      "mock_expected_abstention": false,
+      "gold_label_mode": "fixture",
+      "gold_passage_ids": [
+        1,
+        2
+      ],
+      "before_correct": true,
+      "after_correct": true,
+      "assessment_failed": false,
+      "abstained": false,
+      "reason": null,
+      "policy": "extractive_v4",
+      "model_assessment_performed": true,
+      "selected_passage_ids": [
+        1,
+        2
+      ],
+      "citation_ids_valid": true,
+      "gold_source_selection_correct": true,
+      "duration_ms": 45586.38,
+      "provider_metrics": {
+        "prompt_eval_count": 313,
+        "eval_count": 951,
+        "total_duration": 45486306125,
+        "load_duration": 3870460542,
+        "prompt_eval_duration": 1252101000,
+        "eval_duration": 40333537000,
+        "done_reason": "stop",
+        "content_chars": 47,
+        "thinking_chars": 4037
+      },
+      "group": "independent",
+      "classification": "correct"
+    },
+    {
+      "name": "partial_travel_evidence",
+      "check": "independent_fixed_passages",
+      "expected_abstention": true,
+      "mock_expected_abstention": true,
+      "gold_label_mode": "fixture",
+      "gold_passage_ids": [],
+      "before_correct": false,
+      "after_correct": true,
+      "assessment_failed": false,
+      "abstained": true,
+      "reason": "insufficient_evidence",
+      "policy": "extractive_v4",
+      "model_assessment_performed": true,
+      "selected_passage_ids": [],
+      "citation_ids_valid": true,
+      "gold_source_selection_correct": false,
+      "duration_ms": 58088.95,
+      "provider_metrics": {
+        "prompt_eval_count": 291,
+        "eval_count": 641,
+        "total_duration": 57869851958,
+        "load_duration": 1326274333,
+        "prompt_eval_duration": 1488168000,
+        "eval_duration": 55034383000,
+        "done_reason": "stop",
+        "content_chars": 45,
+        "thinking_chars": 2812
+      },
+      "group": "independent",
+      "classification": "correct_abstention"
+    },
+    {
+      "name": "unresolved_equipment_deadline",
+      "check": "independent_fixed_passages",
+      "expected_abstention": true,
+      "mock_expected_abstention": true,
+      "gold_label_mode": "fixture",
+      "gold_passage_ids": [],
+      "before_correct": false,
+      "after_correct": true,
+      "assessment_failed": false,
+      "abstained": true,
+      "reason": "conflicting_evidence",
+      "policy": "extractive_v4",
+      "model_assessment_performed": false,
+      "selected_passage_ids": [],
+      "citation_ids_valid": true,
+      "gold_source_selection_correct": false,
+      "duration_ms": 6.38,
+      "group": "independent",
+      "classification": "correct_abstention"
+    },
+    {
+      "name": "conditional_pay_policy_unverified",
+      "check": "known_semantic_gap",
+      "expected_abstention": true,
+      "mock_expected_abstention": true,
+      "gold_label_mode": "fixture",
+      "gold_passage_ids": [],
+      "before_correct": false,
+      "after_correct": true,
+      "assessment_failed": false,
+      "abstained": true,
+      "reason": "unverified_pay_condition",
+      "policy": "extractive_v4",
+      "model_assessment_performed": false,
+      "selected_passage_ids": [],
+      "citation_ids_valid": true,
+      "gold_source_selection_correct": false,
+      "duration_ms": 7.89,
+      "group": "existing_regression",
+      "classification": "correct_abstention"
+    },
+    {
+      "name": "supported_implicit_context_refused",
+      "check": "known_conservative_refusal",
+      "expected_abstention": false,
+      "mock_expected_abstention": false,
+      "gold_label_mode": "fixture",
+      "gold_passage_ids": [
+        1
+      ],
+      "before_correct": true,
+      "after_correct": true,
+      "assessment_failed": false,
+      "abstained": false,
+      "reason": null,
+      "policy": "extractive_v4",
+      "model_assessment_performed": true,
+      "selected_passage_ids": [
+        1
+      ],
+      "citation_ids_valid": true,
+      "gold_source_selection_correct": true,
+      "duration_ms": 118737.74,
+      "provider_metrics": {
+        "prompt_eval_count": 272,
+        "eval_count": 997,
+        "total_duration": 118577378209,
+        "load_duration": 2396558792,
+        "prompt_eval_duration": 1972867000,
+        "eval_duration": 114179990000,
+        "done_reason": "stop",
+        "content_chars": 44,
+        "thinking_chars": 4190
+      },
+      "group": "existing_regression",
+      "classification": "correct"
+    },
+    {
+      "name": "facet_keyword_wrong_relation",
+      "check": "deterministic_relation_guard",
+      "expected_abstention": true,
+      "mock_expected_abstention": true,
+      "gold_label_mode": "fixture",
+      "gold_passage_ids": [],
+      "before_correct": false,
+      "after_correct": true,
+      "assessment_failed": false,
+      "abstained": true,
+      "reason": "missing_fact_relation",
+      "policy": "extractive_v4",
+      "model_assessment_performed": false,
+      "selected_passage_ids": [],
+      "citation_ids_valid": true,
+      "gold_source_selection_correct": false,
+      "duration_ms": 1.15,
+      "group": "existing_regression",
+      "classification": "correct_abstention"
+    }
+  ],
+  "groups": {
+    "independent": {
+      "attempted": 4,
+      "correct": 4
+    },
+    "existing_regression": {
+      "attempted": 3,
+      "correct": 3
+    }
+  }
+}

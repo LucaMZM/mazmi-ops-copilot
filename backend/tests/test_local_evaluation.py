@@ -92,6 +92,8 @@ def test_failed_questions_cannot_disappear_from_summary_or_gate():
     assert summary["attempted_questions"] == 1
     assert summary["completed_questions"] == 0
     assert summary["http_errors"] == 1
+    assert summary["answerable_cases"] == summary["unanswered_answerable_cases"] == 1
+    assert summary["completed_answerable_cases"] == 0
     assert summary["document_mrr"] is None
     assert not evaluation.fixture_checks_passed(
         {"summary": summary, "journey_checks": {"safe": True}}
