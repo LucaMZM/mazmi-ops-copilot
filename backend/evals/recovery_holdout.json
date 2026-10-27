@@ -1,0 +1,38 @@
+[
+  {
+    "name": "onboarding_deadline",
+    "question": "¿Cuándo debe devolverse la tarjeta de acceso al terminar el contrato?",
+    "texts": ["La tarjeta de acceso se devuelve a recepción el último día del contrato. El portátil se devuelve en tres días laborables."],
+    "decision": {"status": "sufficient", "passage_ids": [1]},
+    "expected_abstention": false,
+    "check": "independent_fixed_passages",
+    "baseline_answer": "El último día del contrato. [1]"
+  },
+  {
+    "name": "travel_approval_and_archive",
+    "question": "¿Quién autoriza el viaje de trabajo y dónde se archiva el justificante?",
+    "texts": ["Todo viaje de trabajo necesita autorización previa de la jefa de equipo.", "El justificante del viaje se archiva en la carpeta de gastos del workspace."],
+    "decision": {"status": "sufficient", "passage_ids": [1, 2]},
+    "expected_abstention": false,
+    "check": "independent_fixed_passages",
+    "baseline_answer": "La jefa de equipo; carpeta de gastos. [1] [2]"
+  },
+  {
+    "name": "partial_travel_evidence",
+    "question": "¿Quién autoriza el viaje y cuál es el máximo diario de alojamiento?",
+    "texts": ["Todo viaje de trabajo necesita autorización previa de la jefa de equipo. El justificante se archiva en la carpeta de gastos."],
+    "decision": {"status": "insufficient", "passage_ids": []},
+    "expected_abstention": true,
+    "check": "independent_fixed_passages",
+    "baseline_answer": "La jefa de equipo; máximo diario 90 euros. [1]"
+  },
+  {
+    "name": "unresolved_equipment_deadline",
+    "question": "¿Cuántos días laborables hay para devolver equipos prestados?",
+    "texts": ["Los equipos prestados se devuelven en 2 días laborables.", "Los equipos prestados se devuelven en 7 días laborables."],
+    "decision": {"status": "conflicting", "passage_ids": []},
+    "expected_abstention": true,
+    "check": "independent_fixed_passages",
+    "baseline_answer": "Hay 2 días laborables. [1]"
+  }
+]

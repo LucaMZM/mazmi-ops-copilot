@@ -98,6 +98,19 @@ def test_failed_questions_cannot_disappear_from_summary_or_gate():
     )
 
 
+@pytest.mark.parametrize("case,expected", [
+    ({"http_status": 503, "classification": "timeout"}, "timeout"),
+    ({"expected_abstention": True, "abstained": True,
+      "abstention_reason": "incomplete_evidence_assessment"}, "technical_error"),
+    ({"expected_abstention": True, "abstained": True}, "correct_abstention"),
+    ({"expected_abstention": False, "abstained": True}, "false_abstention"),
+    ({"expected_abstention": False, "abstained": False,
+      "all_expected_documents_cited": False}, "unsupported_answer"),
+])
+def test_case_classification_does_not_count_failure_as_correct_abstention(case, expected):
+    assert evaluation.classify_case(case) == expected
+
+
 @pytest.mark.parametrize(
     "path,expected_route",
     [

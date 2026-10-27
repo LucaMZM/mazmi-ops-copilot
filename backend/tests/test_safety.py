@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from app import agent, main, rag
 from app.auth import Principal, principal
 from app.config import settings
+from app.evidence import ASSESSMENT_FAILURE
 from app.schemas import TicketPayload
 
 
@@ -140,10 +141,10 @@ def test_invalid_answers_never_stream(monkeypatch, bad_text):
         "ASK",
         emit=events.append,
     )
-    assert text == agent.ABSTENTION and pending is None
+    assert text == ASSESSMENT_FAILURE and pending is None
     assert meta["abstention_reason"] == "invalid_evidence_assessment"
     assert [e for e in events if e["type"] == "delta"] == [
-        {"type": "delta", "text": agent.ABSTENTION}
+        {"type": "delta", "text": ASSESSMENT_FAILURE}
     ]
 
 

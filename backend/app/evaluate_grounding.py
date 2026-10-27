@@ -17,8 +17,18 @@ from .evidence import documentary_answer
 EVALS = Path(__file__).resolve().parents[1] / "evals"
 
 
-def evaluate(*, client=None, case_names=None, include_answers=True):
-    cases = json.loads((EVALS / "grounding_cases.json").read_text())
+# These fixtures inject a bad mocked decision despite answerable source text.
+# Live assessors choose their own IDs, so semantic gold differs from mock guards.
+LIVE_GOLD = {
+    "fabricated_passage": [1],
+    "invented_assertion": [1],
+    "selected_subset_missing_salary": [2],
+    "selected_subset_wrong_relation": [2],
+}
+
+
+def evaluate(*, client=None, case_names=None, include_answers=True, dataset_path=None):
+    cases = json.loads((dataset_path or EVALS / "grounding_cases.json").read_text())
     if case_names is not None:
         unknown = set(case_names) - {case["name"] for case in cases}
         if unknown:
@@ -32,6 +42,15 @@ def evaluate(*, client=None, case_names=None, include_answers=True):
     }
     results = []
     for case in cases:
+        live_ids = LIVE_GOLD.get(case["name"]) if client is not None else None
+        expected_abstention = case["expected_abstention"] if live_ids is None else False
+        gold_ids = case["decision"]["passage_ids"] if live_ids is None else live_ids
+        labels = {
+            "expected_abstention": expected_abstention,
+            "mock_expected_abstention": case["expected_abstention"],
+            "gold_label_mode": "live-semantic-override" if live_ids is not None else "fixture",
+            "gold_passage_ids": gold_ids if not expected_abstention else [],
+        }
 
         def create(decision=case["decision"], **kwargs):
             assert kwargs["tools"] == []
@@ -55,7 +74,7 @@ def evaluate(*, client=None, case_names=None, include_answers=True):
                 {
                     "name": case["name"],
                     "check": case["check"],
-                    "expected_abstention": case["expected_abstention"],
+                    **labels,
                     "provider_error": type(exc).__name__,
                     "model_assessment_performed": True,
                     "duration_ms": round((time.perf_counter() - started) * 1000, 2),
@@ -63,14 +82,19 @@ def evaluate(*, client=None, case_names=None, include_answers=True):
             )
             continue
         abstained = bool(meta["abstention_reason"])
+        assessment_failed = client is not None and meta["abstention_reason"] in {
+            "incomplete_evidence_assessment", "invalid_evidence_assessment",
+            "invalid_evidence_selection",
+        }
         refs = [int(n) for n in re.findall(r"\[(\d+)\]", case["baseline_answer"])]
         before_abstained = not sources or not refs or any(n < 1 or n > len(sources) for n in refs)
         result = {
             "name": case["name"],
             "check": case["check"],
-            "expected_abstention": case["expected_abstention"],
-            "before_correct": before_abstained == case["expected_abstention"],
-            "after_correct": abstained == case["expected_abstention"],
+            **labels,
+            "before_correct": before_abstained == expected_abstention,
+            "after_correct": not assessment_failed and abstained == expected_abstention,
+            "assessment_failed": assessment_failed,
             "abstained": abstained,
             "reason": meta["abstention_reason"],
             "policy": meta["evidence_policy"],
@@ -78,32 +102,42 @@ def evaluate(*, client=None, case_names=None, include_answers=True):
             "selected_passage_ids": meta["selected_passage_ids"],
             "citation_ids_valid": all(1 <= i <= len(sources) for i in meta["citations"]),
             "gold_source_selection_correct": not abstained
-            and not case["expected_abstention"]
-            and set(meta["selected_passage_ids"]) == set(case["decision"]["passage_ids"]),
+            and not expected_abstention
+            and set(meta["selected_passage_ids"]) == set(gold_ids),
             "duration_ms": round((time.perf_counter() - started) * 1000, 2),
         }
+        if "provider_metrics" in meta:
+            result["provider_metrics"] = meta["provider_metrics"]
         if include_answers:
             result["answer"] = text
         results.append(result)
     completed = [r for r in results if "provider_error" not in r]
-    negatives = [r for r in completed if r["expected_abstention"]]
-    positives = [r for r in completed if not r["expected_abstention"]]
+    negatives = [r for r in results if r["expected_abstention"]]
+    positives = [r for r in results if not r["expected_abstention"]]
     answered = [r for r in completed if not r["abstained"]]
-    paired = [r for r in completed if r["name"] in historical]
+    paired = [r for r in completed if r["name"] in historical] if client is None and dataset_path is None else []
     paired_negatives = [r for r in paired if r["expected_abstention"]]
     return {
         "mode": "live-ollama-fixed-passages" if client is not None else "offline-assessor-doubles",
         "retrieval": "fixed-fixture-passages; no vector search or embeddings measured",
         "cases": results,
+        "attempted_cases": len(results),
+        "correct_cases": sum(r.get("after_correct", False) for r in results),
+        "accuracy_all_attempts": (
+            sum(r.get("after_correct", False) for r in results) / len(results) if results else None
+        ),
         "provider_errors": len(results) - len(completed),
         "completed_cases": len(completed),
+        "assessment_failures": sum(r.get("assessment_failed", False) for r in results),
         "assessor_calls": sum(r["model_assessment_performed"] for r in results),
-        "before_correct_abstentions": sum(r["before_correct"] for r in negatives),
+        "before_correct_abstentions": sum(r.get("before_correct", False) for r in negatives),
         "before_description": "Legacy citation-only gate; historical extractive_v2 comparison is separate below",
-        "after_correct_abstentions": sum(r["after_correct"] for r in negatives),
+        "after_correct_abstentions": sum(r.get("after_correct", False) for r in negatives),
         "unanswerable_cases": len(negatives),
-        "false_abstentions": sum(r["abstained"] for r in positives),
+        "false_abstentions": sum(r.get("abstained", False) for r in positives),
         "answerable_cases": len(positives),
+        "answerable_provider_errors": sum("provider_error" in r for r in positives),
+        "unanswerable_provider_errors": sum("provider_error" in r for r in negatives),
         "answer_precision": (
             sum(not r["expected_abstention"] for r in answered) / len(answered)
             if answered
@@ -137,6 +171,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true", help="Explicit Ollama-only model calls")
     parser.add_argument("--case", action="append", dest="case_names", help="Run only named cases")
+    parser.add_argument("--dataset", type=Path, help="Explicit local fixed-passage evaluation dataset")
     args = parser.parse_args()
     client = None
     if args.live:
@@ -148,7 +183,8 @@ def main():
         client = generation_client()
     print(
         json.dumps(
-            evaluate(client=client, case_names=args.case_names, include_answers=not args.live),
+            evaluate(client=client, case_names=args.case_names, include_answers=not args.live,
+                     dataset_path=args.dataset),
             ensure_ascii=False,
             indent=2,
         )

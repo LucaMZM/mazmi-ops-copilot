@@ -162,7 +162,7 @@ class Ollama:
             payload["format"] = kwargs["text"]["format"]["schema"]
         return payload
 
-    def result(self, data, content=None, calls=None):
+    def result(self, data, content=None, calls=None, thinking_chars=None):
         if not isinstance(data, dict):
             raise ProviderUnavailable("Respuesta Ollama incompatible")
         if "error" in data:
@@ -198,15 +198,32 @@ class Ollama:
                     call_id=uuid4().hex,
                 )
             )
+        metrics = {
+            key: data[key]
+            for key in (
+                "prompt_eval_count", "eval_count", "total_duration", "load_duration",
+                "prompt_eval_duration", "eval_duration",
+            )
+            if type(data.get(key)) is int and 0 <= data[key] <= 2**63 - 1
+        }
+        metrics["done_reason"] = (
+            data.get("done_reason") if data.get("done_reason") in {"stop", "length"} else "unknown"
+        )
+        metrics["content_chars"] = len(text)
+        metrics["thinking_chars"] = (
+            thinking_chars if thinking_chars is not None else
+            len(message["thinking"]) if isinstance(message.get("thinking"), str) else 0
+        )
         return NS(
+            provider_metrics=metrics,
             status="completed"
             if data.get("done") and data.get("done_reason", "stop") == "stop"
             else "incomplete",
             output=output,
             output_text=text,
             usage=NS(
-                input_tokens=data.get("prompt_eval_count", 0),
-                output_tokens=data.get("eval_count", 0),
+                input_tokens=metrics.get("prompt_eval_count", 0),
+                output_tokens=metrics.get("eval_count", 0),
             ),
         )
 
@@ -225,7 +242,7 @@ class Ollama:
             response.raise_for_status()
 
             def events():
-                content, calls = "", []
+                content, calls, thinking_chars = "", [], 0
                 for line in response.iter_lines():
                     if not line:
                         continue
@@ -241,6 +258,9 @@ class Ollama:
                     new_calls = message.get("tool_calls", [])
                     if not isinstance(delta, str) or not isinstance(new_calls, list):
                         raise ProviderUnavailable("Evento de streaming Ollama incompatible")
+                    thought = message.get("thinking", "")
+                    if isinstance(thought, str):
+                        thinking_chars += len(thought)
                     content += delta
                     calls.extend(new_calls)
                     if len(content) > 100000 or len(calls) > 4:
@@ -248,7 +268,7 @@ class Ollama:
                     if delta:
                         yield NS(type="response.output_text.delta", delta=delta)
                     if data.get("done"):
-                        result = self.result(data, content, calls)
+                        result = self.result(data, content, calls, thinking_chars)
                         yield NS(
                             type="response.completed"
                             if result.status == "completed"

@@ -1,0 +1,11 @@
+{
+  "date": "2026-10-27",
+  "stage": "real-pipeline candidate, after first ASK HTTP200 and before audit read",
+  "classification": "technical_error",
+  "error_type": "psycopg.ConnectionTimeout",
+  "filesystem_error": "Operation timed out reading project/runtime files in synchronized folder",
+  "first_ask_http_duration_ms": 113423,
+  "semantic_result": "not recovered; not counted as model success or failure",
+  "remaining_cases": "not executed in this aborted attempt",
+  "action": "preserved sources; recreated isolated validation runtime outside synchronized folders"
+}

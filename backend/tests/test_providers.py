@@ -294,3 +294,36 @@ def test_local_stream_rejects_non_object_messages(message):
         client.create(model="qwen3:4b", input=[], stream=True) as events,
     ):
         list(events)
+
+
+def test_native_metrics_are_allowlisted_and_reject_invalid_values():
+    data = {
+        "done": True, "done_reason": "length", "prompt_eval_count": 530,
+        "eval_count": 2000, "load_duration": 12, "eval_duration": 24,
+        "total_duration": -1, "prompt_eval_duration": True,
+        "private_detail": "secret", "message": {"thinking": "private-thought", "content": ""},
+    }
+    result = Ollama().result(data)
+    assert result.provider_metrics == {
+        "prompt_eval_count": 530, "eval_count": 2000, "load_duration": 12,
+        "eval_duration": 24, "done_reason": "length", "content_chars": 0,
+        "thinking_chars": len("private-thought"),
+    }
+    assert "private" not in str(vars(result)) and "secret" not in str(vars(result))
+    data["done_reason"] = "private-arbitrary-message"
+    assert Ollama().result(data).provider_metrics["done_reason"] == "unknown"
+
+
+def test_streamed_thinking_metrics_count_lengths_without_emitting_text():
+    frames = [
+        {"message": {"thinking": "secret"}, "done": False},
+        {"message": {"thinking": "thought", "content": "{}"}, "done": True, "done_reason": "stop"},
+    ]
+    client = Ollama(httpx.MockTransport(lambda r: httpx.Response(
+        200, text="\n".join(json.dumps(f) for f in frames)
+    )))
+    with client.create(model="qwen3:4b", input=[], stream=True) as stream:
+        events = list(stream)
+    assert events[-1].response.provider_metrics["thinking_chars"] == 13
+    assert events[-1].response.provider_metrics["content_chars"] == 2
+    assert "secret" not in str(events) and "thought" not in str(events)

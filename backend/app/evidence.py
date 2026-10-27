@@ -16,6 +16,7 @@ from .config import settings
 from .schemas import StrictModel
 
 ABSTENTION = "No encuentro información suficiente en la documentación para responder con fuentes verificables."
+ASSESSMENT_FAILURE = "No he podido completar la comprobación de la evidencia. Inténtalo de nuevo; esto no confirma que falte información en los documentos."
 CONFLICT = "Los documentos recuperados contienen información contradictoria. No puedo dar una respuesta única sin aclarar qué política se aplica."
 
 
@@ -131,25 +132,66 @@ def missing_fact_relation(question, content):
     leave = r"\b(vacacion\w*|holidays?|annual leave)\b"
     if not (re.search(pay, question) and re.search(leave, question)):
         return False
-    # Do not construct a relationship by joining separate chunks or sentences.
-    for clause in re.split(r"[.!?;\n]+", content):
-        clause = normalize(clause)
-        if re.search(
-            pay
-            + r"[^.!?;\n]*\b(durante|en|por|during)\s+"
-            + r"(?:(?:las|los|el|su|sus|the|annual)\s+){0,2}"
-            + leave,
-            clause,
-        ) or re.search(
-            r"\b(durante|en|during)\s+"
-            + r"(?:(?:las|los|el|su|sus|the|annual)\s+){0,2}"
-            + leave
-            + r"[^.!?;\n]*"
-            + pay,
-            clause,
-        ):
-            return False
+    # A newline is a hard boundary, including when separate chunks are joined.
+    for paragraph in content.split("\n"):
+        clauses = [normalize(c) for c in re.split(r"[.!?;]+", paragraph) if c.strip()]
+        for clause in clauses:
+            if re.search(
+                pay
+                + r"[^.!?;\n]*\b(durante|en|por|during)\s+"
+                + r"(?:(?:las|los|el|su|sus|the|annual)\s+){0,2}"
+                + leave,
+                clause,
+            ) or re.search(
+                r"\b(durante|en|during)\s+"
+                + r"(?:(?:las|los|el|su|sus|the|annual)\s+){0,2}"
+                + leave
+                + r"[^.!?;\n]*"
+                + pay,
+                clause,
+            ):
+                return False
+        # Only this adjacent, unambiguous reference is admitted. Extra subjects,
+        # uncertainty, conditions and intervening sentences are not resolved here.
+        for antecedent, reference in zip(clauses, clauses[1:], strict=False):
+            if re.fullmatch(
+                r"las vacaciones(?: anuales)? son \d+ dias(?: laborables| naturales)?",
+                antecedent,
+            ) and re.fullmatch(
+                r"en ese periodo el (?:salario|sueldo) (?:es de|se mantiene en) "
+                r"\d+(?:[,.]\d+)? euros",
+                reference,
+            ):
+                return False
     return True
+
+
+def unverified_pay_condition(question, content):
+    """Reject an explicit conditional pay policy without its exact asserted premise.
+
+    This deliberately does not infer paraphrases or join evidence across paragraphs.
+    Even a recognized premise only permits the model to assess sufficiency.
+    """
+    question = normalize(question)
+    if not (re.search(FACT_FACETS["pay"], question) and re.search(r"\bvacacion\w*", question)):
+        return False
+    for paragraph in content.split("\n"):
+        sentences = [normalize(s) for s in re.split(r"[.!?;]+", paragraph) if s.strip()]
+        for sentence in sentences:
+            match = re.fullmatch(r"si ([^,]+), (.+)", sentence)
+            if not match or missing_fact_relation(question, match[2]):
+                continue
+            premise = match[1]
+            # Exact standalone assertion, not a mention inside an uncertainty,
+            # negative, question or another conditional clause.
+            if premise not in sentences or re.search(
+                r"\b(no|nunca|quizas|quiza|podria|puede|consta|desconoce|si)\b", premise
+            ):
+                return True
+            # A question cannot serve as the asserted premise.
+            if re.search(r"[¿?]", paragraph):
+                return True
+    return False
 
 
 def document_instruction(text):
@@ -178,7 +220,7 @@ def documentary_answer(client, question, sources, history=None, emit=None):
         "output_tokens": 0,
         "tools": [],
         "citations": [],
-        "evidence_policy": "extractive_v3",
+        "evidence_policy": "extractive_v4",
         "model_assessment_performed": False,
         "selected_passage_ids": [],
         "abstention_reason": None,
@@ -188,7 +230,12 @@ def documentary_answer(client, question, sources, history=None, emit=None):
         meta["abstention_reason"] = reason
         meta["duration_ms"] = int((time.perf_counter() - started) * 1000)
         if reason:
-            text = CONFLICT if reason == "conflicting_evidence" else ABSTENTION
+            text = (
+                CONFLICT if reason == "conflicting_evidence" else
+                ASSESSMENT_FAILURE if reason in {
+                    "incomplete_evidence_assessment", "invalid_evidence_assessment"
+                } else ABSTENTION
+            )
         else:
             meta["selected_passage_ids"] = [p["id"] for p in selected]
             meta["citations"] = sorted({p["citation"] for p in selected})
@@ -208,6 +255,8 @@ def documentary_answer(client, question, sources, history=None, emit=None):
         return finish("missing_fact_facet")
     if missing_fact_relation(question, "\n".join(p["text"] for p in items)):
         return finish("missing_fact_relation")
+    if unverified_pay_condition(question, "\n".join(p["text"] for p in items)):
+        return finish("unverified_pay_condition")
     if has_literal_conflict(items):
         return finish("conflicting_evidence")
     if emit:
@@ -253,6 +302,8 @@ def documentary_answer(client, question, sources, history=None, emit=None):
         input_tokens=getattr(usage, "input_tokens", 0) or 0,
         output_tokens=getattr(usage, "output_tokens", 0) or 0,
     )
+    if getattr(response, "provider_metrics", None) is not None:
+        meta["provider_metrics"] = response.provider_metrics
     if any(item.type == "function_call" for item in response.output):
         raise RuntimeError("Herramienta fuera de la autorización del usuario")
     if getattr(response, "status", None) != "completed":
@@ -275,6 +326,8 @@ def documentary_answer(client, question, sources, history=None, emit=None):
         return finish("missing_selected_fact_facet")
     if missing_fact_relation(question, "\n".join(p["text"] for p in selected)):
         return finish("missing_selected_fact_relation")
+    if unverified_pay_condition(question, "\n".join(p["text"] for p in selected)):
+        return finish("unverified_selected_pay_condition")
     if any(document_instruction(p["text"]) for p in selected):
         return finish("document_instruction_detected")
     return finish(selected=selected)

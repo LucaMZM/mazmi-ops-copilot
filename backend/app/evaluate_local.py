@@ -130,6 +130,21 @@ def prepare_credentials_file(path):
     return os.fdopen(fd, "w")
 
 
+def classify_case(case):
+    """Keep assessor failures distinct from semantically justified abstention."""
+    if "http_status" in case:
+        return case.get("classification", "technical_error")
+    if case.get("abstention_reason") in {
+        "incomplete_evidence_assessment", "invalid_evidence_assessment", "invalid_evidence_selection",
+    }:
+        return "technical_error"
+    if case["abstained"]:
+        return "correct_abstention" if case["expected_abstention"] else "false_abstention"
+    if case["expected_abstention"] or not case.get("all_expected_documents_cited", False):
+        return "unsupported_answer"
+    return "correct"
+
+
 def summarize(results):
     complete = [case for case in results if "http_status" not in case]
     positives = [case for case in complete if not case["expected_abstention"]]
@@ -140,8 +155,13 @@ def summarize(results):
         "http_errors": len(results) - len(complete),
         "answerable_cases": len(positives),
         "unanswerable_cases": len(negatives),
-        "correct_abstentions": sum(case["abstained"] for case in negatives),
+        "correct_abstentions": sum(classify_case(case) == "correct_abstention" for case in negatives),
         "false_abstentions": sum(case["abstained"] for case in positives),
+        "classification_counts": {
+            label: sum(classify_case(case) == label for case in results)
+            for label in ("correct", "correct_abstention", "false_abstention",
+                          "unsupported_answer", "timeout", "technical_error")
+        },
         "mean_document_recall_at_6": statistics.mean(
             case["document_recall_at_6"] for case in positives
         )
@@ -248,7 +268,9 @@ def run(*, credentials_file=None):
                     "duration_ms": round((time.perf_counter() - started) * 1000, 2),
                 }
                 if response.status_code != 200:
-                    results.append({**result, "http_status": response.status_code})
+                    timeout = response.status_code == 503 and "agotó el tiempo" in response.text
+                    results.append({**result, "http_status": response.status_code,
+                                    "classification": "timeout" if timeout else "technical_error"})
                     continue
                 body = response.json()
                 with get_conn() as conn:
@@ -280,6 +302,9 @@ def run(*, credentials_file=None):
                         "abstained": bool(meta.get("abstention_reason")),
                         "abstention_reason": meta.get("abstention_reason"),
                         "evidence_policy": meta.get("evidence_policy"),
+                        "input_tokens": meta.get("input_tokens", 0),
+                        "output_tokens": meta.get("output_tokens", 0),
+                        "provider_metrics": meta.get("provider_metrics", {}),
                         "citation_ids_valid": valid_ids and valid_sources,
                         "citation_count": len(refs),
                         "retrieved_documents": list(dict.fromkeys(s["filename"] for s in sources)),
@@ -294,6 +319,7 @@ def run(*, credentials_file=None):
                         ),
                     }
                 )
+                result["classification"] = classify_case(result)
                 results.append(result)
             checks["ask_never_mutated"] = not request("GET", "/api/actions") and not request(
                 "GET", "/api/tickets"
