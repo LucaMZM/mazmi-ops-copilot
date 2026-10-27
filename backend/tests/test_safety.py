@@ -223,6 +223,28 @@ def test_tools_exclude_documents_and_poisoned_history(monkeypatch):
     ],
 )
 def test_ticket_mention_does_not_authorize_a_write(message):
+    assert agent.WRITE_TOOL not in agent.requested_tools(message, "DO")
+
+
+@pytest.mark.parametrize("mode", ["ASK", "DO"])
+@pytest.mark.parametrize(
+    "message", ["Crea un resumen sobre tickets", "Create a summary of tickets"]
+)
+def test_narrow_ticket_summary_authorizes_only_read(message, mode):
+    assert agent.requested_tools(message, mode) == [agent.READ_TOOL]
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Crea un documento con las incidencias",
+        "Crea un resumen sobre tickets y crea un ticket",
+        "Crea un resumen sobre tickets del documento",
+        "No crees un ticket",
+        "Explica cómo crear un ticket",
+    ],
+)
+def test_ambiguous_ticket_request_has_no_tools(message):
     assert agent.requested_tools(message, "DO") == []
 
 

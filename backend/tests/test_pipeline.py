@@ -291,7 +291,7 @@ def test_provider_failure_rolls_back_and_redacts(api, monkeypatch):
         raise RuntimeError("secret-provider-detail")
 
     monkeypatch.setattr(agent.client.responses, "create", fail)
-    r = api.post("/api/chat", json={"message": "Consulta mis tickets"})
+    r = api.post("/api/chat", json={"message": "Busca mis tickets"})
     assert r.status_code == 502
     assert "secret-provider-detail" not in r.text
     assert api.get("/api/conversations").json() == []
@@ -367,38 +367,74 @@ def test_login_logout_and_csrf(api):
     assert api.get("/api/documents").status_code == 200
 
 
-def test_read_tool_returns_result_to_model(api, monkeypatch):
+def test_read_tool_renders_database_result_without_second_model_call(api, monkeypatch):
     calls = []
 
     def respond(**kwargs):
         calls.append(kwargs)
-        if len(calls) == 1:
-            return NS(
-                status="completed",
-                output=[
-                    NS(
-                        type="function_call",
-                        name="get_tickets",
-                        call_id="read_1",
-                        arguments='{"limit":5}',
-                    )
-                ],
-                output_text="",
-                usage=None,
-            )
-        assert kwargs["input"][-1]["type"] == "function_call_output"
+        assert len(calls) == 1
         return NS(
             status="completed",
-            output=[],
-            output_text="No hay tickets abiertos.",
+            output=[
+                NS(
+                    type="function_call",
+                    name="get_tickets",
+                    call_id="read_1",
+                    arguments='{"limit":5}',
+                )
+            ],
+            output_text="IGNORED FABRICATED TICKET #999",
             usage=None,
         )
 
     monkeypatch.setattr(agent.client.responses, "create", respond)
-    result = api.post("/api/chat", json={"message": "Consulta mis tickets", "mode": "ASK"})
+    result = api.post("/api/chat", json={"message": "Busca mis tickets", "mode": "ASK"})
     assert result.status_code == 200, result.text
-    assert len(calls) == 2
+    assert len(calls) == 1
+    assert result.json()["answer"].endswith("No hay tickets en este workspace.")
+    assert result.json()["sources"] == []
     assert "tool.completed" in [a["type"] for a in api.get("/api/activity").json()]
+
+
+def test_exact_ticket_read_is_scoped_limited_and_provider_independent(api, monkeypatch):
+    workspace = api.get("/api/auth/me").json()["workspace_id"]
+    with main.get_conn() as conn:
+        other = conn.execute(
+            "INSERT INTO workspaces(name,slug) VALUES ('Other',%s) RETURNING id", (str(uuid4()),)
+        ).fetchone()[0]
+        for number in range(4):
+            conn.execute(
+                "INSERT INTO tickets(workspace_id,title,description,priority) VALUES (%s,%s,%s,'HIGH')",
+                (workspace, f"Visible {number}", "Private description must not be displayed"),
+            )
+        conn.execute(
+            "INSERT INTO tickets(workspace_id,title,description,priority) VALUES (%s,'FOREIGN','SECRET','LOW')",
+            (other,),
+        )
+    monkeypatch.setattr(agent, "client", None)
+    monkeypatch.setattr(settings, "openai_api_key", "")
+    result = api.post("/api/chat", json={"message": "Lista los últimos 3 tickets", "mode": "ASK"})
+    assert result.status_code == 200, result.text
+    body = result.json()
+    assert body["answer"].count("— Prioridad:") == 3
+    assert "Visible 0" not in body["answer"]
+    assert "FOREIGN" not in body["answer"] and "Private description" not in body["answer"]
+    assert body["pending_action"] is None and body["sources"] == []
+    assert len(api.get("/api/tickets").json()) == 4
+    events = api.get("/api/activity").json()
+    completed = next(e for e in events if e["type"] == "chat.completed")
+    assert completed["details"]["model_calls"] == 0
+    assert completed["details"]["tools"][0]["arguments"] == {"limit": 3}
+    assert not any(e["type"].startswith("action.") for e in events)
+
+
+@pytest.mark.parametrize("limit", ["0", "21", "-3", "3.5"])
+def test_invalid_ticket_limit_is_controlled_without_persisting_chat(api, monkeypatch, limit):
+    monkeypatch.setattr(agent, "client", None)
+    response = api.post("/api/chat", json={"message": f"Lista los últimos {limit} tickets"})
+    assert response.status_code == 400
+    assert "entre 1 y 20" in response.json()["detail"]
+    assert api.get("/api/conversations").json() == []
 
 
 def test_invalid_tool_args_never_persist(api, monkeypatch):

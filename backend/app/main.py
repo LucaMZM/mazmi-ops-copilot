@@ -21,7 +21,15 @@ from pgvector import Vector
 from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
-from .agent import answer, describe_execution, requested_tools
+from .agent import (
+    READ_TOOL,
+    TicketQueryError,
+    answer,
+    describe_execution,
+    direct_ticket_query,
+    explicit_ticket_limit,
+    requested_tools,
+)
 from .auth import COOKIE, CurrentUser, Principal
 from .auth import router as auth_router
 from .config import settings
@@ -122,6 +130,8 @@ def require_provider(role="generation"):
 def provider_error(exc):
     from .providers import ProviderQuotaExceeded
 
+    if isinstance(exc, TicketQueryError):
+        return HTTPException(400, str(exc))
     if isinstance(exc, ProviderQuotaExceeded):
         return HTTPException(429, str(exc))
     if isinstance(exc, ProviderUnavailable):
@@ -449,7 +459,14 @@ def run_chat(
     emit: Callable | None = None,
     cancelled: Event | None = None,
 ):
-    require_provider()
+    try:
+        direct_read = requested_tools(payload.message, payload.mode) == [READ_TOOL] and (
+            direct_ticket_query(payload.message, explicit_ticket_limit(payload.message)) is not None
+        )
+    except TicketQueryError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if not direct_read:
+        require_provider()
     with get_conn() as conn:
         workspace_id = user.workspace_id
         conversation_id = str(payload.conversation_id) if payload.conversation_id else None
@@ -499,16 +516,15 @@ def run_chat(
 
             def read_tickets(limit):
                 rows = conn.execute(
-                    "SELECT id,title,description,priority,status FROM tickets WHERE workspace_id=%s ORDER BY created_at DESC LIMIT %s",
+                    "SELECT id,title,priority,status FROM tickets WHERE workspace_id=%s ORDER BY created_at DESC,id DESC LIMIT %s",
                     (workspace_id, limit),
                 ).fetchall()
                 return [
                     {
                         "id": r[0],
                         "title": r[1],
-                        "description": r[2],
-                        "priority": r[3],
-                        "status": r[4],
+                        "priority": r[2],
+                        "status": r[3],
                     }
                     for r in rows
                 ]
@@ -685,8 +701,8 @@ def decide_action(action_id: UUID, payload: ActionDecision, user: CurrentUser):
                 "status": ticket[3],
             },
         }
-    # Execution is committed before the optional model narration. A provider failure
-    # must never roll back a confirmed action or cause a second execution.
+    # Render the committed receipt without another model call. Formatting must
+    # never roll back a confirmed action or cause a second execution.
     try:
         result["summary"] = describe_execution(action_name, args, result)
     except (OpenAIError, RuntimeError, ValueError):
