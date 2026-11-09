@@ -73,7 +73,15 @@ def test_approvals_are_scoped_to_requester_and_workspace(api, monkeypatch):
     propose(api, monkeypatch)
     rows = api.get("/api/actions").json()
     assert len(rows) == 1 and rows[0]["status"] == "PENDING"
-    assert set(rows[0]) == {"id", "name", "payload", "status", "created_at", "conversation_id"}
+    assert set(rows[0]) == {
+        "id",
+        "name",
+        "payload",
+        "status",
+        "created_at",
+        "conversation_id",
+        "resolved_at",
+    }
     with main.get_conn() as conn:
         conn.execute("UPDATE pending_actions SET requested_by=NULL")
     assert api.get("/api/actions").json() == []

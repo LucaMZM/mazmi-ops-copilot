@@ -28,7 +28,8 @@ export type PendingAction = {
   payload: { title: string; description: string; priority: string };
   status?: string;
   created_at?: string;
-  conversation_id?: string;
+  resolved_at?: string | null;
+  conversation_id?: string | null;
 };
 export type Source = {
   chunk_id: number;
@@ -37,9 +38,16 @@ export type Source = {
   page: number | null;
   excerpt: string;
   score: number;
+  section?: string | null;
 };
-export type Conversation = { id: string; title: string };
+export type Conversation = {
+  id: string;
+  title: string;
+  updated_at?: string;
+  archived?: boolean;
+};
 export type Message = {
+  id?: string;
   role: "user" | "assistant";
   content: string;
   sources?: Source[];
@@ -82,5 +90,18 @@ export type ChunkPage = {
   filename: string;
   total: number;
   offset: number;
-  chunks: { id: number; page: number | null; index: number; content: string }[];
+  chunks: {
+    id: number;
+    page: number | null;
+    index: number;
+    content: string;
+    section?: string | null;
+  }[];
 };
+export type ChatResult = {
+  conversation_id: string;
+  answer: string;
+  sources: Source[];
+  pending_action: PendingAction | null;
+};
+export type Mode = "ASK" | "DO";

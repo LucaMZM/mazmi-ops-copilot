@@ -35,6 +35,25 @@ class Settings(BaseSettings):
     max_document_chunks: int = Field(default=2000, ge=1)
     cookie_secure: bool = False
     cors_origins: str = "http://localhost:3000"
+    # Database pool and server-side safety limits (see db.py).
+    db_pool_max: int = Field(default=10, ge=2, le=100)
+    db_pool_timeout_seconds: float = Field(default=10, gt=0, le=120)
+    db_statement_timeout_ms: int = Field(default=30000, ge=1000, le=600000)
+    db_idle_transaction_timeout_ms: int = Field(default=60000, ge=1000, le=600000)
+    # Model-backed chat turns admitted at once. Local inference on small machines
+    # should stay at 1; queued requests wait at most chat_queue_timeout_seconds.
+    chat_max_concurrent: int = Field(default=2, ge=1, le=32)
+    chat_queue_timeout_seconds: float = Field(default=20, ge=0, le=300)
+    # Upper bound for one streamed chat turn, including queueing and inference.
+    chat_stream_timeout_seconds: float = Field(default=330, ge=10, le=900)
+    # RAG pipeline revisions. The previous behaviour stays selectable so every change
+    # can be compared against its baseline (see backend/evals/v2-*.json).
+    chunking_strategy: Literal["structured_v2", "flat_v1"] = "structured_v2"
+    lexical_query_mode: Literal["any_terms_v2", "all_terms_v1"] = "any_terms_v2"
+    retrieval_max_chunks_per_document: int = Field(default=3, ge=1, le=20)
+    answer_style: Literal["focused_v5", "full_passages_v4"] = "focused_v5"
+    # Qwen3 reasoning control for Ollama. "model_default" is the historical behaviour.
+    ollama_reasoning: Literal["model_default", "no_think_directive"] = "model_default"
 
     @model_validator(mode="after")
     def guard_demo(self):

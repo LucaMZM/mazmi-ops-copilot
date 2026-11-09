@@ -140,11 +140,9 @@ test("failed approval never appears as executed", async () => {
   });
   fireEvent.click(screen.getByLabelText("Enviar mensaje"));
   fireEvent.click(await screen.findByText("Confirmar"));
-  await waitFor(() =>
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "La acción ya fue resuelta",
-    ),
-  );
+  // v2: an already-resolved action is reported as a status notice with the real
+  // state (refreshed from the server), never as an execution.
+  await screen.findByText(/La acción ya fue resuelta/);
   expect(screen.queryByText(/Acción ejecutada/)).not.toBeInTheDocument();
 });
 

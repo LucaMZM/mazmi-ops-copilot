@@ -1,28 +1,23 @@
 "use client";
-import { useEffect, useRef, type ReactNode } from "react";
-import {
-  ArrowRight,
-  Check,
-  X,
-  FileText,
-  ShieldCheck,
-  AlertCircle,
-} from "lucide-react";
+import { memo, useEffect, useRef, type ReactNode } from "react";
+import { AlertCircle, Check, FileText, ShieldCheck, X } from "lucide-react";
 import type { PendingAction, Source } from "./product-types";
 
 export function EmptyState({
   title,
   children,
   action,
+  icon,
 }: {
   title: string;
   children: ReactNode;
   action?: ReactNode;
+  icon?: ReactNode;
 }) {
   return (
     <div className="emptyState">
-      <div className="emptyMark">
-        <FileText size={23} />
+      <div className="emptyMark" aria-hidden="true">
+        {icon ?? <FileText size={22} />}
       </div>
       <h2>{title}</h2>
       <p>{children}</p>
@@ -30,15 +25,22 @@ export function EmptyState({
     </div>
   );
 }
-export function Badge({
-  state,
-  children,
-}: {
-  state: string;
-  children: ReactNode;
-}) {
+
+export function Badge({ state, children }: { state: string; children: ReactNode }) {
   return <span className={`badge ${state}`}>{children}</span>;
 }
+
+export function Spinner({ label }: { label?: string }) {
+  return <span className="spinner" role={label ? "img" : undefined} aria-label={label} />;
+}
+
+const priorityLabel: Record<string, string> = {
+  LOW: "Baja",
+  MEDIUM: "Media",
+  HIGH: "Alta",
+  URGENT: "Urgente",
+};
+
 export function ActionCard({
   action,
   busy,
@@ -49,37 +51,30 @@ export function ActionCard({
   onDecide: (a: PendingAction, yes: boolean) => void;
 }) {
   return (
-    <article className="actionCard">
-      <div className="actionEyebrow">
-        <ShieldCheck size={16} />
-        <span>PROPUESTA · TODAVÍA NO EJECUTADA</span>
+    <article className="actionCard" aria-label={`Propuesta: ${action.payload.title}`}>
+      <div className="actionHeader">
+        <ShieldCheck size={17} aria-hidden="true" />
+        <span>Propuesta sin ejecutar</span>
+        <Badge state={`priority ${action.payload.priority.toLowerCase()}`}>
+          Prioridad {priorityLabel[action.payload.priority] ?? action.payload.priority}
+        </Badge>
       </div>
       <h3>{action.payload.title}</h3>
-      <p>{action.payload.description}</p>
-      <dl className="inlineMetadata">
-        <div>
-          <dt>Herramienta</dt>
-          <dd>Crear ticket interno</dd>
-        </div>
-        <div>
-          <dt>Prioridad</dt>
-          <dd>{action.payload.priority}</dd>
-        </div>
-      </dl>
-      <p className="approvalNote">
-        Al confirmar se creará un ticket en este workspace. Tu decisión quedará
-        registrada.
-      </p>
+      <p className="actionDescription">{action.payload.description}</p>
+      <div className="consequence">
+        <strong>Si confirmas</strong>
+        <p>
+          Se creará un ticket interno en este workspace con este título, descripción y
+          prioridad. La decisión queda registrada en Actividad y no se puede deshacer desde
+          aquí.
+        </p>
+      </div>
       <div className="actionButtons">
-        <button disabled={busy} onClick={() => onDecide(action, false)}>
-          <X size={16} /> Rechazar
+        <button className="ghost" disabled={busy} onClick={() => onDecide(action, false)}>
+          <X size={16} aria-hidden="true" /> Rechazar
         </button>
-        <button
-          className="primary"
-          disabled={busy}
-          onClick={() => onDecide(action, true)}
-        >
-          <Check size={16} /> Confirmar
+        <button className="primary amber" disabled={busy} onClick={() => onDecide(action, true)}>
+          <Check size={16} aria-hidden="true" /> Confirmar
         </button>
       </div>
     </article>
@@ -117,17 +112,12 @@ export function Inspector({
         }
         const first = elements[0],
           last = elements[elements.length - 1];
-        if (
-          e.shiftKey &&
-          (document.activeElement === first ||
-            document.activeElement === root.current)
-        ) {
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === root.current)) {
           e.preventDefault();
           last.focus();
         } else if (
           !e.shiftKey &&
-          (document.activeElement === last ||
-            document.activeElement === root.current)
+          (document.activeElement === last || document.activeElement === root.current)
         ) {
           e.preventDefault();
           first.focus();
@@ -144,7 +134,7 @@ export function Inspector({
     <div className="inspectorBackdrop" onClick={onClose}>
       <div
         ref={root}
-        className="inspector"
+        className="inspector glass"
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -153,16 +143,11 @@ export function Inspector({
       >
         <header>
           <div>
-            <span className="eyebrow">INSPECTOR DE CONOCIMIENTO</span>
             <h2>{title}</h2>
             {subtitle && <p>{subtitle}</p>}
           </div>
-          <button
-            className="iconButton"
-            aria-label="Cerrar inspector"
-            onClick={onClose}
-          >
-            <X size={21} />
+          <button className="iconButton" aria-label="Cerrar inspector" onClick={onClose}>
+            <X size={20} />
           </button>
         </header>
         <div className="inspectorBody">{children}</div>
@@ -170,6 +155,7 @@ export function Inspector({
     </div>
   );
 }
+
 export function SourceChip({
   source,
   index,
@@ -182,25 +168,56 @@ export function SourceChip({
   onOpen: () => void;
 }) {
   return (
-    <button
-      className={`sourceChip ${selected ? "cited" : ""}`}
-      onClick={onOpen}
-    >
-      <span className="sourceNumber">{index}</span>
-      <span>
+    <button className={`sourceChip ${selected ? "cited" : ""}`} onClick={onOpen}>
+      <span className="sourceNumber" aria-hidden="true">
+        {index}
+      </span>
+      <span className="sourceText">
         <strong>{source.filename}</strong>
         <small>
-          {source.page ? `Página ${source.page}` : "Sin paginación"} ·{" "}
-          {selected ? "Citada en la respuesta" : "Recuperada, sin citar"}
+          {source.section ?? (source.page ? `Página ${source.page}` : "Sin paginación")}
+          {selected ? ", citada" : ", recuperada sin citar"}
         </small>
       </span>
-      <ArrowRight size={15} />
     </button>
   );
 }
 
+const ORIGIN = /^Según (.+):$/;
+
+function Inline({
+  text,
+  sources,
+  onSource,
+}: {
+  text: string;
+  sources: Source[];
+  onSource: (s: Source, index: number) => void;
+}) {
+  return (
+    <>
+      {text.split(/(\[\d+\])/g).map((part, j) => {
+        const match = part.match(/^\[(\d+)\]$/);
+        const n = match ? Number(match[1]) : 0;
+        return n > 0 && sources[n - 1] ? (
+          <button
+            className="inlineCitation"
+            key={j}
+            aria-label={`Abrir fuente ${n}`}
+            onClick={() => onSource(sources[n - 1], n)}
+          >
+            {n}
+          </button>
+        ) : (
+          part
+        );
+      })}
+    </>
+  );
+}
+
 // React renders text only. No HTML/Markdown execution from untrusted documents.
-export function AnswerText({
+export const AnswerText = memo(function AnswerText({
   text,
   sources,
   onSource,
@@ -215,44 +232,44 @@ export function AnswerText({
       {blocks.map((block, i) =>
         block.startsWith("```") ? (
           <pre key={i}>
-            <code>
-              {block.replace(/^```[^\n]*\n?/, "").replace(/```$/, "")}
-            </code>
+            <code>{block.replace(/^```[^\n]*\n?/, "").replace(/```$/, "")}</code>
           </pre>
         ) : (
-          <span key={i}>
-            {block.split(/(\[\d+\])/g).map((part, j) => {
-              const match = part.match(/^\[(\d+)\]$/);
-              const n = match ? Number(match[1]) : 0;
-              return n > 0 && sources[n - 1] ? (
-                <button
-                  className="inlineCitation"
-                  key={j}
-                  aria-label={`Abrir fuente ${n}`}
-                  onClick={() => onSource(sources[n - 1], n)}
-                >
-                  {n}
-                </button>
+          <div key={i} className="answerBlock">
+            {block.split("\n").map((line, k) => {
+              const origin = line.match(ORIGIN);
+              return origin ? (
+                <span className="answerOrigin" key={k}>
+                  Según <cite>{origin[1]}</cite>
+                </span>
               ) : (
-                part
+                <span className={line.startsWith("«") ? "answerQuote" : "answerLine"} key={k}>
+                  <Inline text={line} sources={sources} onSource={onSource} />
+                </span>
               );
             })}
-          </span>
+          </div>
         ),
       )}
     </div>
   );
-}
-export function Insufficient({ text }: { text: string }) {
+});
+
+export function Insufficient({ text, kind }: { text: string; kind?: "verification" }) {
   return (
-    <div className="insufficient">
-      <AlertCircle size={18} />
+    <div className={`insufficient ${kind ?? ""}`}>
+      <AlertCircle size={18} aria-hidden="true" />
       <div>
-        <strong>Evidencia insuficiente o en conflicto</strong>
+        <strong>
+          {kind === "verification"
+            ? "Comprobación de evidencia incompleta"
+            : "Evidencia insuficiente o en conflicto"}
+        </strong>
         <p>{text}</p>
         <small>
-          Prueba una pregunta más concreta o añade documentación que cubra el
-          dato.
+          {kind === "verification"
+            ? "El modelo no terminó de evaluar los pasajes. Vuelve a intentarlo; no significa que falte documentación."
+            : "Prueba una pregunta más concreta o añade documentación que cubra el dato."}
         </small>
       </div>
     </div>
