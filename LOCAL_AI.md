@@ -134,3 +134,16 @@ Path("evals/replayed-candidate.json").write_text(json.dumps(report, indent=2))
 Keep native thinking (`think=null`), context 4096, evidence cap 2000, timeout 120 seconds and `keep_alive=0`. The installed preset advertises thinking `true` only. Generated-token counts include thinking; the adapter exposes safe numeric metrics and lengths, never private reasoning text. Observed throughput varied from 8.73 to 25.76 tokens/s; one supported implicit-reference assessment took 118.74 seconds. No token/context/timeout increase was validated.
 
 Keep virtualenvs, node_modules and PostgreSQL clusters **outside synchronized folders**. The first attempt hit filesystem read timeouts and a database connection timeout; the stable external runtime then completed 273 backend tests and the recorded real evaluations. Preserve source/results in the project, keep credentials/private database state outside Git, and follow [migration precautions](database/MIGRATIONS.md). No new migration or collection/reindexing change is required. [VALIDATION.md](VALIDATION.md) records the rejected candidate, native holdout, measured boundaries and release decision.
+
+## MAZMI 2.0: reasoning budget experiment — 9 November 2026
+
+Diagnosis: on this 8 GB M2, Qwen3 4B spends most of the 2,000-token evidence budget on its reasoning phase before writing the JSON decision, which produced incomplete assessments and ~120 s timeouts. Earlier `think=false` attempts were made without structured output and with greedy decoding. MAZMI 2.0 adds an opt-in `OLLAMA_REASONING=no_think_directive` that combines `think=false`, Qwen3's `/no_think` switch, the model's recommended non-thinking sampling and the native JSON schema.
+
+Controlled comparison on the same 8-case local corpus, same v2 pipeline, fresh databases, only this variable changed ([default](backend/evals/v2-local-model-default.json), [no_think](backend/evals/v2-local-no-think.json)):
+
+| Mode | Positives correct | Negatives correct | Unsupported answers | Timeouts / incomplete | Wall time |
+|---|---:|---:|---:|---:|---:|
+| `model_default` (default) | 2/4 | 4/4 | 0 | 1 / 1 | 777 s |
+| `no_think_directive` | 4/4 | 2/4 | **2** | 0 / 0 | 176 s |
+
+Without reasoning the model accepts passages that do not answer the question (delivery time, a person's name). An unsupported answer is worse than an abstention in an evidence system, so **the default is unchanged**. The option exists for measured experiments only. A future candidate is a quote-verified assessment schema (the model must return the exact supporting span, which the server verifies) evaluated on a held-out set.
