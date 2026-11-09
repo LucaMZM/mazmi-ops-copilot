@@ -1,5 +1,6 @@
 """RAG v2: structured chunking, any-term FTS, per-document diversity, focused quotes."""
 
+import re
 from io import BytesIO
 from types import SimpleNamespace as NS
 
@@ -177,3 +178,36 @@ def test_per_document_cap_lets_a_second_document_in(api, monkeypatch):
         selected[cap] = {r["filename"] for r in rows}
     assert selected[3] == {"acceso.md", "auditoria.md"}
     assert normalize("Acceso") == "acceso"
+
+
+def test_focused_quote_drops_list_syntax_and_origin_uses_inner_sections():
+    client = NS(
+        responses=NS(
+            create=lambda **kw: NS(
+                status="completed",
+                output=[],
+                output_text='{"status":"sufficient","passage_ids":[1]}',
+            )
+        )
+    )
+    content = (
+        "### 2.2 Solicitud\n"
+        "- Las vacaciones se solicitan con 10 días de antelación en el portal interno.\n"
+        "- La persona responsable responde en un máximo de 5 días hábiles laborables.\n"
+        "- En los almacenes no se pueden pedir vacaciones durante el inventario anual."
+    )
+    source = {
+        "content": content,
+        "filename": "manual.md",
+        "section": "Manual › 2. Vacaciones › 2.2 Solicitud",
+    }
+    text, _, _ = documentary_answer(
+        client, "¿Se pueden pedir vacaciones en el inventario?", [source]
+    )
+    assert text.startswith("Según manual.md (2. Vacaciones › 2.2 Solicitud):\n«")
+    quote = text.split("«", 1)[1].rsplit("»", 1)[0]
+    assert "- " not in quote and "#" not in quote
+    # Literal per unit: every sentence/list item of the quote exists verbatim.
+    for fragment in quote.split(" … "):
+        for unit in re.split(r"(?<=\.)\s+", fragment.strip(" …")):
+            assert unit in content

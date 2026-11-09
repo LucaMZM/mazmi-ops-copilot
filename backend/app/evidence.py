@@ -240,8 +240,10 @@ def _units(text):
         line = line.strip()
         if not line or line.startswith("#") or re.fullmatch(r"\|?\s*:?-{3,}.*", line):
             continue
-        if line.startswith("|") or re.match(r"(?:[-*•+]|\d+[.)])\s", line):
+        if line.startswith("|"):
             units.append(line)
+        elif marker := re.match(r"(?:[-*•+]|\d+[.)])\s+", line):
+            units.append(line[marker.end() :])  # The item text, without list syntax.
         else:
             units.extend(u for u in re.split(r"(?<=[.!?])\s+", line) if u.strip())
     return units
@@ -250,8 +252,9 @@ def _units(text):
 def focused_quote(question, text, max_chars=700):
     """Return verbatim sentences of ``text`` that address ``question``.
 
-    Deterministic and extractive: every returned fragment is a literal substring of the
-    stored passage; omitted spans are marked with " … ". Short passages are returned
+    Deterministic and extractive: every returned unit (sentence, list item or table row)
+    is a literal substring of the stored passage. Adjacent units are joined by a space,
+    list syntax is dropped and omitted spans are marked with " … ". Short passages are returned
     whole. When no sentence shares vocabulary with the question (paraphrase), the whole
     passage is returned rather than guessing.
     """
@@ -286,7 +289,8 @@ def focused_quote(question, text, max_chars=700):
 
 def _origin(source):
     name = source.get("filename")
-    section = source.get("section")
+    # The two innermost headings identify the passage without repeating the title.
+    section = " › ".join((source.get("section") or "").split(" › ")[-2:]) or None
     if name and section:
         return f"Según {name} ({section})"
     if name:
