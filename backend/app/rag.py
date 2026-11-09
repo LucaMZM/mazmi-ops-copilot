@@ -5,6 +5,7 @@ import json
 import logging
 import math
 import time
+from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
@@ -40,6 +41,18 @@ def split_text(text: str, chunk_size: int = 1200, overlap: int = 220) -> list[st
             break
         start = max(end - overlap, start + 1)
     return chunks
+
+
+@dataclass(frozen=True)
+class Chunk:
+    page: int | None
+    content: str
+    section: str | None = None
+
+
+def chunk_pages(pages: list[tuple[int | None, str]], filename: str = "") -> list[Chunk]:
+    """Split extracted pages into stored chunks (page metadata only when real)."""
+    return [Chunk(page, chunk) for page, text in pages for chunk in split_text(text)]
 
 
 def extract_pages(filename: str, raw: bytes) -> list[tuple[int | None, str]]:
@@ -111,8 +124,28 @@ def embed_query(text: str) -> list[float]:
     return embed_texts([text], query=True)[0]
 
 
+def prepare_query(query: str) -> tuple[str, Vector]:
+    """Embed a retrieval query outside any database transaction.
+
+    Returns the collection identity observed before and after the provider call, so
+    a configuration/model change during the call can never mix collections.
+    """
+    collection = embedding_collection()
+    vector = Vector(embed_query(query))
+    if collection != embedding_collection():
+        raise RuntimeError("La colección cambió durante la consulta")
+    return collection, vector
+
+
 def retrieve(
-    conn, workspace_id: str, query: str, limit: int = 6, *, diagnostics=None, lexical_query=None
+    conn,
+    workspace_id: str,
+    query: str,
+    limit: int = 6,
+    *,
+    diagnostics=None,
+    lexical_query=None,
+    prepared: tuple[str, Vector] | None = None,
 ) -> list[dict]:
     """Workspace-scoped exact vector candidates + Spanish FTS, fused with RRF.
 
@@ -123,10 +156,7 @@ def retrieve(
     if not 1 <= limit <= 20:
         raise ValueError("limit debe estar entre 1 y 20")
     started = time.perf_counter()
-    collection = embedding_collection()
-    vector = Vector(embed_query(query))
-    if collection != embedding_collection():
-        raise RuntimeError("La colección cambió durante la consulta")
+    collection, vector = prepared if prepared is not None else prepare_query(query)
     candidate_limit = max(24, limit * 4)
     columns = "c.id,c.document_id,d.filename,c.page_number,c.content"
     filters = """c.workspace_id=%s AND d.workspace_id=%s

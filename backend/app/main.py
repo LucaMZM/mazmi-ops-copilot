@@ -1,21 +1,36 @@
+"""MAZMI Ops Copilot API.
+
+Chat turns run in explicit phases so PostgreSQL never holds a transaction or row
+lock while a provider computes embeddings or generates (tens of seconds locally):
+
+1. ``preflight_chat``  – pure validation: tool gate, limits, provider requirements.
+2. ``load_history``    – short read-only transaction (conversation scope + history).
+3. ``gather_sources``  – query embedding without a connection, then a short SQL read.
+4. ``answer``          – provider work, with no connection held.
+5. ``persist_turn``    – one atomic write that re-checks scope, cited chunks and
+                         idempotency, then stores messages, proposal and audit.
+
+Cancellation (disconnect/timeout) is checked between phases and inside the final
+transaction before commit, so an abandoned turn leaves no partial rows.
+"""
+
 from __future__ import annotations
 
 import json
 import logging
 import time
 from collections.abc import Callable
+from contextlib import asynccontextmanager, contextmanager
 from io import BytesIO
-from pathlib import Path
-from threading import Event
+from threading import BoundedSemaphore, Event, Lock, Thread
 from typing import Annotated
 from uuid import UUID, uuid4
 
 import psycopg
-from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from openai import OpenAIError
-from pgvector import Vector
 from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
@@ -28,12 +43,16 @@ from .agent import (
     explicit_ticket_limit,
     requested_tools,
 )
+from .audit import audit
 from .auth import COOKIE, CurrentUser, Principal
 from .auth import router as auth_router
 from .config import settings
-from .db import get_conn
-from .providers import ProviderUnavailable, require_config
-from .rag import embed_texts, embedding_collection, extract_pages, retrieve, split_text
+from .conversations import router as conversations_router
+from .db import DatabaseBusy, close_pool, get_conn
+from .documents import recover_interrupted_indexing
+from .documents import router as documents_router
+from .errors import provider_error, require_provider
+from .rag import prepare_query, retrieve
 from .schemas import (
     ActionDecision,
     ChatRequest,
@@ -46,7 +65,26 @@ from .schemas import (
 from .speech import synthesize, transcribe
 from .streaming import StreamCancelled, sse_response
 
-app = FastAPI(title="MAZMI Ops Copilot API", version="0.1.0")
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger(__name__)
+
+
+def _recover_in_background() -> None:
+    try:
+        recover_interrupted_indexing()
+    except (psycopg.Error, DatabaseBusy) as exc:
+        logger.error("Indexing recovery skipped: %s", type(exc).__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup never waits on the database: recovery is best-effort and asynchronous.
+    Thread(target=_recover_in_background, daemon=True, name="mazmi-recovery").start()
+    yield
+    await run_in_threadpool(close_pool)
+
+
+app = FastAPI(title="MAZMI Ops Copilot API", version="2.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[x.strip() for x in settings.cors_origins.split(",")],
@@ -54,10 +92,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 app.include_router(auth_router)
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-logger = logging.getLogger(__name__)
+app.include_router(documents_router)
+app.include_router(conversations_router)
+
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Cross-Origin-Resource-Policy": "same-origin",
+}
 
 
 @app.middleware("http")
@@ -72,6 +116,10 @@ async def request_observability(request: Request, call_next):
         return JSONResponse(status_code=403, content={"detail": "Origen no permitido"})
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
+    for header, value in SECURITY_HEADERS.items():
+        response.headers.setdefault(header, value)
+    if request.url.path.startswith("/api/"):
+        response.headers.setdefault("Cache-Control", "no-store")
     logger.info(
         json.dumps(
             {
@@ -86,28 +134,6 @@ async def request_observability(request: Request, call_next):
     return response
 
 
-def audit(
-    conn,
-    user: Principal,
-    event: str,
-    details: dict,
-    conversation_id=None,
-    duration_ms=None,
-):
-    conn.execute(
-        "INSERT INTO audit_events(workspace_id,user_id,conversation_id,event_type,actor,details,duration_ms) VALUES (%s,%s,%s,%s,%s,%s::jsonb,%s)",
-        (
-            user.workspace_id,
-            user.user_id,
-            conversation_id,
-            event,
-            user.email,
-            json.dumps(details, default=str),
-            duration_ms,
-        ),
-    )
-
-
 @app.exception_handler(psycopg.Error)
 async def database_error(request, exc):
     logger.error("Database failure: %s", type(exc).__name__)
@@ -117,29 +143,9 @@ async def database_error(request, exc):
     )
 
 
-def require_provider(role="generation"):
-    try:
-        require_config(
-            settings.embedding_provider if role == "embedding" else settings.generation_provider
-        )
-    except ProviderUnavailable as exc:
-        raise HTTPException(503, str(exc)) from exc
-
-
-def provider_error(exc):
-    from .providers import ProviderQuotaExceeded
-
-    if isinstance(exc, TicketQueryError):
-        return HTTPException(400, str(exc))
-    if isinstance(exc, ProviderQuotaExceeded):
-        return HTTPException(429, str(exc))
-    if isinstance(exc, ProviderUnavailable):
-        return HTTPException(503, str(exc))
-    # Do not expose upstream errors: they may contain credentials or document content.
-    logger.error("Provider failure: %s", type(exc).__name__)
-    return HTTPException(
-        502, "El proveedor de IA no pudo completar la solicitud. Inténtalo de nuevo."
-    )
+@app.exception_handler(DatabaseBusy)
+async def database_busy(request, exc):
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
 @app.get("/health")
@@ -148,6 +154,7 @@ def health():
         conn.execute("SELECT 1")
     return {
         "status": "ok",
+        "version": app.version,
         "openai_configured": bool(settings.openai_api_key),
         "generation_provider": "demo" if settings.demo_mode else settings.generation_provider,
         "embedding_provider": "demo" if settings.demo_mode else settings.embedding_provider,
@@ -178,278 +185,61 @@ def verify_local_provider(user: CurrentUser):
     return configuration()
 
 
-@app.get("/api/documents/{document_id}/chunks")
-def document_chunks(document_id: UUID, user: CurrentUser, offset: int = Query(0, ge=0)):
-    with get_conn() as conn:
-        doc = conn.execute(
-            "SELECT filename,chunk_count FROM documents WHERE id=%s AND workspace_id=%s",
-            (document_id, user.workspace_id),
-        ).fetchone()
-        if not doc:
-            raise HTTPException(404, "Documento no encontrado")
-        rows = conn.execute(
-            "SELECT id,page_number,chunk_index,content FROM document_chunks WHERE document_id=%s AND workspace_id=%s ORDER BY chunk_index LIMIT 25 OFFSET %s",
-            (document_id, user.workspace_id, offset),
-        ).fetchall()
-    return {
-        "filename": doc[0],
-        "total": doc[1],
-        "offset": offset,
-        "chunks": [{"id": r[0], "page": r[1], "index": r[2], "content": r[3]} for r in rows],
-    }
-
-
-@app.get("/api/actions")
-def list_actions(user: CurrentUser):
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT id,action_name,payload,status,created_at,conversation_id FROM pending_actions WHERE workspace_id=%s AND requested_by=%s ORDER BY created_at DESC LIMIT 50",
-            (user.workspace_id, user.user_id),
-        ).fetchall()
-    return [
-        {
-            "id": str(r[0]),
-            "name": r[1],
-            "payload": r[2],
-            "status": r[3],
-            "created_at": r[4],
-            "conversation_id": str(r[5]),
-        }
-        for r in rows
-    ]
-
-
-@app.get("/api/documents")
-def list_documents(user: CurrentUser):
-    with get_conn() as conn:
-        workspace_id = user.workspace_id
-        rows = conn.execute(
-            "SELECT id, filename, page_count, chunk_count, status, created_at, mime_type, size_bytes, error, embedding_model, indexed_at, embedding_collection, embedding_dimensions FROM documents WHERE workspace_id=%s ORDER BY created_at DESC",
-            (workspace_id,),
-        ).fetchall()
-    return [
-        {
-            "id": str(r[0]),
-            "filename": r[1],
-            "pages": r[2],
-            "chunks": r[3],
-            "status": r[4],
-            "created_at": r[5],
-            "mime_type": r[6],
-            "size_bytes": r[7],
-            "error": r[8],
-            "embedding_model": r[9],
-            "indexed_at": r[10],
-            "embedding_collection": r[11],
-            "embedding_dimensions": r[12],
-        }
-        for r in rows
-    ]
-
-
-@app.post("/api/documents")
-async def upload_document(file: Annotated[UploadFile, File()], user: CurrentUser):
-    raw = await file.read(20 * 1024 * 1024 + 1)
-    await file.close()
-    filename = Path((file.filename or "document").replace("\\", "/")).name
-    filename = "".join(c for c in filename if c.isprintable())[:200]
-    return await run_in_threadpool(index_document, filename, file.content_type, raw, user)
-
-
-def index_document(filename: str, content_type: str | None, raw: bytes, user: Principal):
-    if len(raw) > 20 * 1024 * 1024:
-        raise HTTPException(413, "El archivo supera 20 MB")
-    supported = {
-        ".pdf": {"application/pdf"},
-        ".docx": {"application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
-        ".txt": {"text/plain"},
-        ".md": {"text/markdown", "text/plain"},
-    }
-    ext = Path(filename).suffix.lower()
-    if ext not in supported or (
-        content_type and content_type not in supported[ext] | {"application/octet-stream"}
-    ):
-        raise HTTPException(400, "Extensión o MIME no admitido. Usa PDF, DOCX, TXT o MD.")
-    require_provider("embedding")
-    try:
-        collection = embedding_collection()
-    except Exception as exc:
-        raise provider_error(exc) from exc
-    with get_conn() as conn:
-        doc_id = conn.execute(
-            "INSERT INTO documents(workspace_id,filename,mime_type,size_bytes,status,embedding_model,embedding_collection,embedding_dimensions) VALUES (%s,%s,%s,%s,'processing',%s,%s,%s) RETURNING id",
-            (
-                user.workspace_id,
-                filename,
-                content_type,
-                len(raw),
-                settings.embedding_model,
-                collection,
-                settings.vector_dimensions,
-            ),
-        ).fetchone()[0]
-    started = time.perf_counter()
-    try:
-        try:
-            pages = extract_pages(filename, raw)
-        except Exception as exc:
-            raise HTTPException(
-                400,
-                "No se pudo extraer texto. Comprueba que el archivo no esté dañado, cifrado o sea un PDF escaneado.",
-            ) from exc
-        prepared = [(page, chunk) for page, text in pages for chunk in split_text(text)]
-        if not prepared:
-            raise HTTPException(400, "El documento no contiene texto extraíble")
-        if len(prepared) > settings.max_document_chunks:
-            raise HTTPException(413, "Demasiados fragmentos; divide el documento")
-        embeddings = []
-        for i in range(0, len(prepared), 64):
-            embeddings.extend(embed_texts([x[1] for x in prepared[i : i + 64]]))
-        if collection != embedding_collection():
-            raise RuntimeError("El modelo cambió durante la indexación")
-        with get_conn() as conn:
-            # A deletion during indexing must not resurrect the document.
-            if not conn.execute(
-                "SELECT id FROM documents WHERE id=%s AND workspace_id=%s FOR UPDATE",
-                (doc_id, user.workspace_id),
-            ).fetchone():
-                raise HTTPException(409, "Documento eliminado durante la indexación")
-            for index, ((page, content), embedding) in enumerate(
-                zip(prepared, embeddings, strict=True)
-            ):
-                conn.execute(
-                    "INSERT INTO document_chunks(document_id,workspace_id,page_number,chunk_index,content,embedding) VALUES (%s,%s,%s,%s,%s,%s)",
-                    (
-                        doc_id,
-                        user.workspace_id,
-                        page,
-                        index,
-                        content,
-                        Vector(embedding),
-                    ),
-                )
-            conn.execute(
-                "UPDATE documents SET status='ready',page_count=%s,chunk_count=%s,indexed_at=now() WHERE id=%s",
-                (len(pages), len(prepared), doc_id),
-            )
-            audit(
-                conn,
-                user,
-                "document.indexed",
-                {
-                    "document_id": str(doc_id),
-                    "filename": filename,
-                    "chunks": len(prepared),
-                    "model": settings.embedding_model,
-                    "embedding_collection": collection,
-                },
-                duration_ms=int((time.perf_counter() - started) * 1000),
-            )
-    except Exception as exc:
-        detail = (
-            str(exc)
-            if isinstance(exc, ProviderUnavailable)
-            else exc.detail
-            if isinstance(exc, HTTPException)
-            else "No se pudo completar la indexación; vuelve a subir el archivo"
-        )
-        with get_conn() as conn:
-            conn.execute(
-                "UPDATE documents SET status='failed',error=%s WHERE id=%s AND workspace_id=%s",
-                (detail, doc_id, user.workspace_id),
-            )
-            audit(
-                conn,
-                user,
-                "document.failed",
-                {"document_id": str(doc_id), "error": detail},
-            )
-        if isinstance(exc, HTTPException):
-            raise
-        raise provider_error(exc) from exc
-    return {
-        "id": str(doc_id),
-        "filename": filename,
-        "pages": len(pages),
-        "chunks": len(prepared),
-        "status": "ready",
-    }
-
-
-@app.delete("/api/documents/{document_id}")
-def delete_document(document_id: UUID, user: CurrentUser):
-    with get_conn() as conn:
-        row = conn.execute(
-            "DELETE FROM documents WHERE id=%s AND workspace_id=%s RETURNING filename",
-            (document_id, user.workspace_id),
-        ).fetchone()
-        if not row:
-            raise HTTPException(404, "Documento no encontrado")
-        audit(
-            conn,
-            user,
-            "document.deleted",
-            {"document_id": str(document_id), "filename": row[0]},
-        )
-    return {"status": "deleted"}
-
-
-@app.post("/api/documents/{document_id}/reindex")
-def reindex_document(document_id: UUID, user: CurrentUser):
-    require_provider("embedding")
-    try:
-        collection = embedding_collection()
-        with get_conn() as conn:
-            doc = conn.execute(
-                "SELECT id FROM documents WHERE id=%s AND workspace_id=%s FOR UPDATE",
-                (document_id, user.workspace_id),
-            ).fetchone()
-            if not doc:
-                raise HTTPException(404, "Documento no encontrado")
-            chunks = conn.execute(
-                "SELECT id,content FROM document_chunks WHERE document_id=%s AND workspace_id=%s ORDER BY chunk_index FOR UPDATE",
-                (document_id, user.workspace_id),
-            ).fetchall()
-            if not chunks:
-                raise HTTPException(409, "Sin texto conservado; vuelve a subir el documento")
-            vectors = []
-            for offset in range(0, len(chunks), 64):
-                vectors.extend(embed_texts([row[1] for row in chunks[offset : offset + 64]]))
-            if collection != embedding_collection():
-                raise RuntimeError("El modelo cambió durante la reindexación")
-            conn.execute(
-                "UPDATE documents SET embedding_model=%s,embedding_collection=%s,embedding_dimensions=%s,status='ready',error=NULL,indexed_at=now() WHERE id=%s",
-                (settings.embedding_model, collection, settings.vector_dimensions, document_id),
-            )
-            for row, vector in zip(chunks, vectors, strict=True):
-                conn.execute(
-                    "UPDATE document_chunks SET embedding=%s,embedding_collection=%s WHERE id=%s",
-                    (Vector(vector), collection, row[0]),
-                )
-            audit(
-                conn,
-                user,
-                "document.reindexed",
-                {
-                    "document_id": str(document_id),
-                    "embedding_collection": collection,
-                    "chunks": len(chunks),
-                },
-            )
-        return {"status": "ready", "embedding_collection": collection}
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise provider_error(exc) from exc
-
-
-@app.post("/api/chat", response_model=ChatResponse)
-def chat(payload: ChatRequest, user: CurrentUser):
-    return run_chat(payload, user)
+# ---------------------------------------------------------------------------
+# Chat
+# ---------------------------------------------------------------------------
 
 
 class ChatCancelled(StreamCancelled):
     pass
+
+
+def check_cancelled(cancelled: Event | None) -> None:
+    if cancelled is not None and cancelled.is_set():
+        raise ChatCancelled("Consulta cancelada antes de persistir")
+
+
+_slot_lock = Lock()
+_slots: tuple[int, BoundedSemaphore] | None = None
+
+
+def _generation_slots() -> BoundedSemaphore:
+    global _slots
+    with _slot_lock:
+        if _slots is None or _slots[0] != settings.chat_max_concurrent:
+            _slots = (settings.chat_max_concurrent, BoundedSemaphore(settings.chat_max_concurrent))
+        return _slots[1]
+
+
+@contextmanager
+def generation_slot(emit: Callable | None, cancelled: Event | None):
+    """Bound concurrent model-backed turns; queue briefly, then fail clearly (503)."""
+    slots = _generation_slots()
+    if not slots.acquire(blocking=False):
+        if emit:
+            emit(
+                {
+                    "type": "status",
+                    "stage": "queued",
+                    "text": "En cola: el modelo está atendiendo otra consulta…",
+                }
+            )
+        deadline = time.monotonic() + settings.chat_queue_timeout_seconds
+        while True:
+            check_cancelled(cancelled)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise HTTPException(
+                    503,
+                    "El copiloto está atendiendo otras consultas. Inténtalo de nuevo en unos"
+                    " segundos.",
+                )
+            if slots.acquire(timeout=min(0.25, remaining)):
+                break
+    try:
+        yield
+    finally:
+        slots.release()
 
 
 def preflight_chat(payload: ChatRequest) -> bool:
@@ -485,114 +275,164 @@ def check_conversation(conversation_id, user: Principal) -> None:
             raise HTTPException(404, "Conversación no encontrada")
 
 
-def run_chat(
+def _stored_response(conn, user: Principal, request_id: UUID) -> ChatResponse | None:
+    row = conn.execute(
+        "SELECT workspace_id,response FROM chat_requests WHERE user_id=%s AND request_id=%s",
+        (user.user_id, request_id),
+    ).fetchone()
+    if not row:
+        return None
+    if str(row[0]) != user.workspace_id:
+        raise HTTPException(409, "Ese identificador de petición pertenece a otro workspace")
+    response = ChatResponse.model_validate(row[1])
+    if response.pending_action is not None:
+        status = conn.execute(
+            "SELECT status FROM pending_actions WHERE id=%s AND workspace_id=%s",
+            (response.pending_action.id, user.workspace_id),
+        ).fetchone()
+        if not status or status[0] != "PENDING":
+            # Replays never resurrect an action that has since been decided.
+            response.pending_action = None
+    return response
+
+
+def replay_chat(payload: ChatRequest, user: Principal) -> ChatResponse | None:
+    if payload.client_request_id is None:
+        return None
+    with get_conn() as conn:
+        return _stored_response(conn, user, payload.client_request_id)
+
+
+def load_history(conversation_id: str | None, user: Principal) -> list[dict]:
+    if not conversation_id:
+        return []
+    with get_conn() as conn:
+        if not conn.execute(
+            "SELECT 1 FROM conversations WHERE id=%s AND workspace_id=%s",
+            (conversation_id, user.workspace_id),
+        ).fetchone():
+            raise HTTPException(404, "Conversación no encontrada")
+        rows = conn.execute(
+            "SELECT role,content FROM messages WHERE conversation_id=%s ORDER BY id DESC LIMIT 12",
+            (conversation_id,),
+        ).fetchall()
+    return [{"role": r[0], "content": r[1][:4000]} for r in reversed(rows)]
+
+
+def gather_sources(payload: ChatRequest, history: list[dict], user: Principal):
+    retrieval_query = "\n".join(
+        [m["content"] for m in history if m["role"] == "user"][-2:] + [payload.message]
+    )[-12000:]
+    started = time.perf_counter()
+    prepared = prepare_query(retrieval_query)  # Provider call: no connection held.
+    embedding_ms = int((time.perf_counter() - started) * 1000)
+    diagnostics: dict = {}
+    with get_conn() as conn:
+        sources = retrieve(
+            conn,
+            user.workspace_id,
+            retrieval_query,
+            limit=6,
+            diagnostics=diagnostics,
+            lexical_query=payload.message,
+            prepared=prepared,
+        )
+    diagnostics["embedding_ms"] = embedding_ms
+    return sources, diagnostics, int((time.perf_counter() - started) * 1000)
+
+
+def read_tickets_for(user: Principal):
+    def read_tickets(limit):
+        with get_conn() as conn:
+            rows = conn.execute(
+                "SELECT id,title,priority,status FROM tickets WHERE workspace_id=%s"
+                " ORDER BY created_at DESC,id DESC LIMIT %s",
+                (user.workspace_id, limit),
+            ).fetchall()
+        return [{"id": r[0], "title": r[1], "priority": r[2], "status": r[3]} for r in rows]
+
+    return read_tickets
+
+
+def validate_pending(pending: dict | None, payload: ChatRequest) -> dict | None:
+    if not pending:
+        return None
+    if (
+        payload.mode != "DO"
+        or pending.get("name") != "create_ticket"
+        or "create_ticket"
+        not in {tool["name"] for tool in requested_tools(payload.message, payload.mode)}
+    ):
+        raise HTTPException(502, "Propuesta de acción no permitida")
+    try:
+        payload_data = TicketPayload.model_validate(pending["payload"]).model_dump()
+    except (ValidationError, KeyError, TypeError) as exc:
+        raise HTTPException(502, "Propuesta de acción no válida") from exc
+    return {"name": "create_ticket", "payload": payload_data}
+
+
+def persist_turn(
     payload: ChatRequest,
     user: Principal,
-    emit: Callable | None = None,
-    cancelled: Event | None = None,
-):
-    preflight_chat(payload)
+    conversation_id: str | None,
+    text: str,
+    sources: list[dict],
+    pending: dict | None,
+    meta: dict,
+    cancelled: Event | None,
+) -> ChatResponse:
+    workspace_id = user.workspace_id
     with get_conn() as conn:
-        workspace_id = user.workspace_id
-        conversation_id = str(payload.conversation_id) if payload.conversation_id else None
-        if (
-            conversation_id
-            and not conn.execute(
-                "SELECT id FROM conversations WHERE id=%s AND workspace_id=%s FOR UPDATE",
+        request_id = payload.client_request_id
+        if request_id is not None:
+            # Serialize duplicates of the same request; the loser replays the winner.
+            conn.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"chat:{user.user_id}:{request_id}",),
+            )
+            stored = _stored_response(conn, user, request_id)
+            if stored is not None:
+                return stored
+        if conversation_id:
+            if not conn.execute(
+                "SELECT 1 FROM conversations WHERE id=%s AND workspace_id=%s FOR UPDATE",
                 (conversation_id, workspace_id),
-            ).fetchone()
-        ):
-            raise HTTPException(404, "Conversación no encontrada")
-        if not conversation_id:
+            ).fetchone():
+                raise HTTPException(404, "Conversación no encontrada")
+        else:
             conversation_id = str(
                 conn.execute(
                     "INSERT INTO conversations(workspace_id,title) VALUES (%s,%s) RETURNING id",
                     (workspace_id, payload.message[:70]),
                 ).fetchone()[0]
             )
-        history_rows = conn.execute(
-            "SELECT role,content FROM messages WHERE conversation_id=%s ORDER BY id DESC LIMIT 12",
-            (conversation_id,),
-        ).fetchall()
-        history = [{"role": r[0], "content": r[1][:4000]} for r in reversed(history_rows)]
+        chunk_ids = sorted({s["chunk_id"] for s in sources})
+        if chunk_ids:
+            # Evidence must still exist, be ready and belong to this workspace at commit.
+            alive = conn.execute(
+                "SELECT count(*) FROM document_chunks c JOIN documents d ON d.id=c.document_id"
+                " WHERE c.id = ANY(%s) AND c.workspace_id=%s AND d.workspace_id=%s"
+                " AND d.status='ready' AND c.embedding_collection=d.embedding_collection",
+                (chunk_ids, workspace_id, workspace_id),
+            ).fetchone()[0]
+            if alive != len(chunk_ids):
+                raise HTTPException(
+                    409,
+                    "Un documento consultado se eliminó o cambió durante la respuesta. No se"
+                    " guardó nada; vuelve a preguntar.",
+                )
         conn.execute(
             "INSERT INTO messages(conversation_id,role,content) VALUES (%s,'user',%s)",
             (conversation_id, payload.message),
         )
-        try:
-            retrieval_query = "\n".join(
-                [m["content"] for m in history if m["role"] == "user"][-2:] + [payload.message]
-            )[-12000:]
-            retrieval_started = time.perf_counter()
-            retrieval_meta = {}
-            if requested_tools(payload.message, payload.mode):
-                sources = []
-                retrieval_meta = {"strategy": "tool_request_no_documents", "selected": []}
-            else:
-                sources = retrieve(
-                    conn,
-                    workspace_id,
-                    retrieval_query,
-                    limit=6,
-                    diagnostics=retrieval_meta,
-                    lexical_query=payload.message,
-                )
-            retrieval_ms = int((time.perf_counter() - retrieval_started) * 1000)
-
-            def read_tickets(limit):
-                rows = conn.execute(
-                    "SELECT id,title,priority,status FROM tickets WHERE workspace_id=%s ORDER BY created_at DESC,id DESC LIMIT %s",
-                    (workspace_id, limit),
-                ).fetchall()
-                return [
-                    {
-                        "id": r[0],
-                        "title": r[1],
-                        "priority": r[2],
-                        "status": r[3],
-                    }
-                    for r in rows
-                ]
-
-            text, pending, meta = answer(
-                payload.message, sources, payload.mode, history, read_tickets, emit
-            )
-            meta.update(
-                {
-                    "generation_provider": "demo"
-                    if settings.demo_mode
-                    else settings.generation_provider,
-                    "retrieval_ms": retrieval_ms,
-                    "retrieval": retrieval_meta,
-                    "retrieved_chunks": len(sources),
-                    "source_chunk_ids": [s["chunk_id"] for s in sources],
-                }
-            )
-            if cancelled and cancelled.is_set():
-                raise ChatCancelled("Consulta cancelada antes de persistir")
-            for tool_event in meta["tools"]:
-                audit(conn, user, "tool.completed", tool_event, conversation_id)
-        except ChatCancelled:
-            raise
-        except Exception as exc:
-            raise provider_error(exc) from exc
-
+        for tool_event in meta["tools"]:
+            audit(conn, user, "tool.completed", tool_event, conversation_id)
         pending_action = None
         if pending:
-            if (
-                payload.mode != "DO"
-                or pending.get("name") != "create_ticket"
-                or "create_ticket"
-                not in {tool["name"] for tool in requested_tools(payload.message, payload.mode)}
-            ):
-                raise HTTPException(502, "Propuesta de acción no permitida")
-            try:
-                pending["payload"] = TicketPayload.model_validate(pending["payload"]).model_dump()
-            except (ValidationError, KeyError, TypeError) as exc:
-                raise HTTPException(502, "Propuesta de acción no válida") from exc
             action_id = str(
                 conn.execute(
-                    "INSERT INTO pending_actions(workspace_id,conversation_id,action_name,payload,requested_by) VALUES (%s,%s,%s,%s::jsonb,%s) RETURNING id",
+                    "INSERT INTO pending_actions(workspace_id,conversation_id,action_name,payload,"
+                    "requested_by) VALUES (%s,%s,%s,%s::jsonb,%s) RETURNING id",
                     (
                         workspace_id,
                         conversation_id,
@@ -606,17 +446,12 @@ def run_chat(
                 conn,
                 user,
                 "action.proposed",
-                {
-                    "action_id": action_id,
-                    "name": pending["name"],
-                    "payload": pending["payload"],
-                },
+                {"action_id": action_id, "name": pending["name"], "payload": pending["payload"]},
                 conversation_id,
             )
             pending_action = PendingAction(
                 id=action_id, name=pending["name"], payload=pending["payload"]
             )
-
         public_sources = [
             Source(
                 chunk_id=s["chunk_id"],
@@ -625,16 +460,18 @@ def run_chat(
                 page=s["page"],
                 excerpt=s["excerpt"],
                 score=s["score"],
+                section=s.get("section"),
             )
             for s in sources
         ]
         conn.execute(
-            "INSERT INTO messages(conversation_id,role,content,sources) VALUES (%s,'assistant',%s,%s::jsonb)",
-            (
-                conversation_id,
-                text,
-                json.dumps([s.model_dump() for s in public_sources]),
-            ),
+            "INSERT INTO messages(conversation_id,role,content,sources)"
+            " VALUES (%s,'assistant',%s,%s::jsonb)",
+            (conversation_id, text, json.dumps([s.model_dump() for s in public_sources])),
+        )
+        conn.execute(
+            "UPDATE conversations SET updated_at=now(), archived_at=NULL WHERE id=%s",
+            (conversation_id,),
         )
         audit(
             conn,
@@ -644,12 +481,139 @@ def run_chat(
             conversation_id,
             meta["duration_ms"],
         )
-        return ChatResponse(
+        response = ChatResponse(
             conversation_id=conversation_id,
             answer=text,
             sources=public_sources,
             pending_action=pending_action,
         )
+        if request_id is not None:
+            conn.execute(
+                "DELETE FROM chat_requests WHERE user_id=%s AND created_at < now()-interval '1 day'",
+                (user.user_id,),
+            )
+            conn.execute(
+                "INSERT INTO chat_requests(user_id,request_id,workspace_id,conversation_id,response)"
+                " VALUES (%s,%s,%s,%s,%s::jsonb)",
+                (
+                    user.user_id,
+                    request_id,
+                    workspace_id,
+                    conversation_id,
+                    response.model_dump_json(),
+                ),
+            )
+        # Last checkpoint inside the transaction: a disconnect now rolls everything back.
+        check_cancelled(cancelled)
+        return response
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+def chat(payload: ChatRequest, user: CurrentUser):
+    return run_chat(payload, user)
+
+
+def run_chat(
+    payload: ChatRequest,
+    user: Principal,
+    emit: Callable | None = None,
+    cancelled: Event | None = None,
+) -> ChatResponse:
+    direct_read = preflight_chat(payload)
+    replayed = replay_chat(payload, user)
+    if replayed is not None:
+        return replayed
+    conversation_id = str(payload.conversation_id) if payload.conversation_id else None
+    history = load_history(conversation_id, user)
+    tools = requested_tools(payload.message, payload.mode)
+    read_tickets = read_tickets_for(user)
+    try:
+        if direct_read:
+            sources, retrieval_meta, retrieval_ms = [], {"strategy": "tool_request_no_documents"}, 0
+            text, pending, meta = answer(
+                payload.message, sources, payload.mode, history, read_tickets, emit
+            )
+        else:
+            with generation_slot(emit, cancelled):
+                check_cancelled(cancelled)
+                if tools:
+                    sources = []
+                    retrieval_meta = {"strategy": "tool_request_no_documents", "selected": []}
+                    retrieval_ms = 0
+                else:
+                    if emit:
+                        emit({"type": "status", "stage": "retrieving", "text": "Buscando fuentes…"})
+                    sources, retrieval_meta, retrieval_ms = gather_sources(payload, history, user)
+                    check_cancelled(cancelled)
+                text, pending, meta = answer(
+                    payload.message, sources, payload.mode, history, read_tickets, emit
+                )
+    except (ChatCancelled, HTTPException, psycopg.Error, DatabaseBusy):
+        raise
+    except Exception as exc:
+        raise provider_error(exc) from exc
+    check_cancelled(cancelled)
+    pending = validate_pending(pending, payload)
+    meta.update(
+        {
+            "generation_provider": "demo" if settings.demo_mode else settings.generation_provider,
+            "retrieval_ms": retrieval_ms,
+            "retrieval": retrieval_meta,
+            "retrieved_chunks": len(sources),
+            "source_chunk_ids": [s["chunk_id"] for s in sources],
+        }
+    )
+    if emit:
+        emit({"type": "status", "stage": "saving", "text": "Guardando la respuesta…"})
+    return persist_turn(payload, user, conversation_id, text, sources, pending, meta, cancelled)
+
+
+@app.post("/api/chat/stream")
+async def stream_chat(payload: ChatRequest, user: CurrentUser, request: Request):
+    # Validation errors keep real HTTP status codes; only accepted turns stream.
+    await run_in_threadpool(preflight_chat, payload)
+    await run_in_threadpool(check_conversation, payload.conversation_id, user)
+
+    def work(emit, cancelled):
+        return run_chat(payload, user, emit, cancelled).model_dump(mode="json")
+
+    return sse_response(
+        request,
+        work,
+        timeout=settings.chat_stream_timeout_seconds,
+        cancelled_exc=ChatCancelled,
+        initial=[{"type": "status", "stage": "accepted", "text": "Consulta recibida…"}],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Human approval
+# ---------------------------------------------------------------------------
+
+STATUS_LABELS = {"EXECUTED": "ejecutada", "REJECTED": "rechazada", "APPROVED": "aprobada"}
+
+
+@app.get("/api/actions")
+def list_actions(user: CurrentUser):
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id,action_name,payload,status,created_at,conversation_id,resolved_at"
+            " FROM pending_actions WHERE workspace_id=%s AND requested_by=%s"
+            " ORDER BY created_at DESC LIMIT 50",
+            (user.workspace_id, user.user_id),
+        ).fetchall()
+    return [
+        {
+            "id": str(r[0]),
+            "name": r[1],
+            "payload": r[2],
+            "status": r[3],
+            "created_at": r[4],
+            "conversation_id": str(r[5]) if r[5] else None,
+            "resolved_at": r[6],
+        }
+        for r in rows
+    ]
 
 
 @app.post("/api/actions/{action_id}/decision")
@@ -658,14 +622,18 @@ def decide_action(action_id: UUID, payload: ActionDecision, user: CurrentUser):
     with get_conn() as conn:
         workspace_id = user.workspace_id
         row = conn.execute(
-            "SELECT action_name,payload,status,conversation_id FROM pending_actions WHERE id=%s AND workspace_id=%s AND requested_by=%s FOR UPDATE",
+            "SELECT action_name,payload,status,conversation_id FROM pending_actions"
+            " WHERE id=%s AND workspace_id=%s AND requested_by=%s FOR UPDATE",
             (action_id, workspace_id, user.user_id),
         ).fetchone()
         if not row:
             raise HTTPException(404, "Acción no encontrada")
         action_name, args, status, conversation_id = row
         if status != "PENDING":
-            raise HTTPException(409, "La acción ya fue resuelta")
+            # Exactly-once: a repeated or concurrent decision never re-executes.
+            raise HTTPException(
+                409, f"La acción ya fue resuelta ({STATUS_LABELS.get(status, status.lower())})."
+            )
         if not payload.approved:
             conn.execute(
                 "UPDATE pending_actions SET status='REJECTED',resolved_at=now() WHERE id=%s",
@@ -691,7 +659,8 @@ def decide_action(action_id: UUID, payload: ActionDecision, user: CurrentUser):
         except ValidationError as exc:
             raise HTTPException(409, "La acción almacenada no es válida") from exc
         ticket = conn.execute(
-            "INSERT INTO tickets(workspace_id,title,description,priority) VALUES (%s,%s,%s,%s) RETURNING id,title,priority,status",
+            "INSERT INTO tickets(workspace_id,title,description,priority) VALUES (%s,%s,%s,%s)"
+            " RETURNING id,title,priority,status",
             (workspace_id, args["title"], args["description"], args["priority"]),
         ).fetchone()
         conn.execute(
@@ -738,10 +707,10 @@ def decide_action(action_id: UUID, payload: ActionDecision, user: CurrentUser):
 @app.get("/api/activity")
 def activity(user: CurrentUser):
     with get_conn() as conn:
-        workspace_id = user.workspace_id
         rows = conn.execute(
-            "SELECT id,event_type,actor,details,duration_ms,created_at FROM audit_events WHERE workspace_id=%s ORDER BY created_at DESC LIMIT 50",
-            (workspace_id,),
+            "SELECT id,event_type,actor,details,duration_ms,created_at FROM audit_events"
+            " WHERE workspace_id=%s ORDER BY created_at DESC, id DESC LIMIT 50",
+            (user.workspace_id,),
         ).fetchall()
     return [
         {
@@ -759,21 +728,20 @@ def activity(user: CurrentUser):
 @app.get("/api/tickets")
 def tickets(user: CurrentUser):
     with get_conn() as conn:
-        workspace_id = user.workspace_id
         rows = conn.execute(
-            "SELECT id,title,priority,status,created_at FROM tickets WHERE workspace_id=%s ORDER BY created_at DESC LIMIT 50",
-            (workspace_id,),
+            "SELECT id,title,priority,status,created_at FROM tickets WHERE workspace_id=%s"
+            " ORDER BY created_at DESC LIMIT 50",
+            (user.workspace_id,),
         ).fetchall()
     return [
-        {
-            "id": r[0],
-            "title": r[1],
-            "priority": r[2],
-            "status": r[3],
-            "created_at": r[4],
-        }
+        {"id": r[0], "title": r[1], "priority": r[2], "status": r[3], "created_at": r[4]}
         for r in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# Optional voice
+# ---------------------------------------------------------------------------
 
 
 @app.post("/api/voice/speak")
@@ -795,55 +763,3 @@ async def voice_transcribe(file: Annotated[UploadFile, File()], user: CurrentUse
         return {"text": await run_in_threadpool(transcribe, data)}
     except Exception as exc:
         raise provider_error(exc) from exc
-
-
-@app.get("/api/conversations")
-def conversations(user: CurrentUser):
-    with get_conn() as conn:
-        workspace_id = user.workspace_id
-        rows = conn.execute(
-            "SELECT id,title,created_at FROM conversations WHERE workspace_id=%s ORDER BY created_at DESC LIMIT 50",
-            (workspace_id,),
-        ).fetchall()
-    return [{"id": str(r[0]), "title": r[1], "created_at": r[2]} for r in rows]
-
-
-@app.get("/api/conversations/{conversation_id}")
-def conversation(conversation_id: UUID, user: CurrentUser):
-    with get_conn() as conn:
-        workspace_id = user.workspace_id
-        if not conn.execute(
-            "SELECT id FROM conversations WHERE id=%s AND workspace_id=%s",
-            (conversation_id, workspace_id),
-        ).fetchone():
-            raise HTTPException(404, "Conversación no encontrada")
-        rows = conn.execute(
-            "SELECT role,content,sources FROM messages WHERE conversation_id=%s ORDER BY id",
-            (conversation_id,),
-        ).fetchall()
-        actions = conn.execute(
-            "SELECT id,action_name,payload FROM pending_actions WHERE conversation_id=%s AND workspace_id=%s AND status='PENDING' AND requested_by=%s ORDER BY created_at",
-            (conversation_id, workspace_id, user.user_id),
-        ).fetchall()
-    return {
-        "messages": [{"role": r[0], "content": r[1], "sources": r[2]} for r in rows],
-        "pending_actions": [{"id": str(r[0]), "name": r[1], "payload": r[2]} for r in actions],
-    }
-
-
-@app.post("/api/chat/stream")
-async def stream_chat(payload: ChatRequest, user: CurrentUser, request: Request):
-    # Validation errors keep real HTTP status codes; only accepted turns stream.
-    await run_in_threadpool(preflight_chat, payload)
-    await run_in_threadpool(check_conversation, payload.conversation_id, user)
-
-    def work(emit, cancelled):
-        return run_chat(payload, user, emit, cancelled).model_dump(mode="json")
-
-    return sse_response(
-        request,
-        work,
-        timeout=settings.chat_stream_timeout_seconds,
-        cancelled_exc=ChatCancelled,
-        initial=[{"type": "status", "stage": "accepted", "text": "Consulta recibida…"}],
-    )

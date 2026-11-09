@@ -31,3 +31,13 @@ No requiere migración 005: 004 ya permite colecciones y dimensiones independien
 ## Renovación de producto y demo (20 de octubre de 2026)
 
 No se añade migración 005 ni se modifican 003/004. Las vistas de configuración, aprobaciones e inspector utilizan tablas existentes. La demo exige una base dedicada terminada en `_demo` y rechaza poblarla si contiene usuarios/documentos/tickets, antes de ejecutar migraciones. Las pruebas de integración siguieron usando esquemas aislados en una base temporal. No se aplicaron migraciones a bases del usuario.
+
+## Migración 005: fiabilidad v2 (noviembre de 2026)
+
+Solo aditiva: no elimina, renombra ni cambia tipos de columnas existentes.
+
+- `conversations.updated_at` (rellenada con la fecha del último mensaje o la creación) y `conversations.archived_at` (archivado sin borrado: mensajes, propuestas y auditoría se conservan). Índice parcial `conversations_recent_idx`.
+- `document_chunks.section` nullable: ruta de encabezados del chunking estructurado. Los fragmentos existentes quedan con `NULL`; contenido, vectores y colecciones no cambian, así que **no requiere reindexar**.
+- Tabla `chat_requests` para idempotencia de turnos de chat por `(user_id, request_id)`; la aplicación purga filas de más de 24 horas del mismo usuario al escribir.
+
+Precauciones para bases existentes: las mismas de 003/004 (backup restaurable, espacio, ventana de mantenimiento). El `UPDATE` de relleno de `updated_at` reescribe las filas de `conversations` (normalmente pequeña) bajo el `statement_timeout` de 120 s del runner; `ADD COLUMN section` sin valor por defecto es solo de catálogo. Validado en esta sesión sobre esquemas temporales de PostgreSQL 17.11 (suite de integración y ejecución doble del runner). No se aplicó a ninguna base del usuario.
