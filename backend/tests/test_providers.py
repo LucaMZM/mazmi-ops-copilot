@@ -327,3 +327,23 @@ def test_streamed_thinking_metrics_count_lengths_without_emitting_text():
     assert events[-1].response.provider_metrics["thinking_chars"] == 13
     assert events[-1].response.provider_metrics["content_chars"] == 2
     assert "secret" not in str(events) and "thought" not in str(events)
+
+
+def test_no_think_directive_is_opt_in_and_never_greedy(monkeypatch):
+    from app.config import settings
+    from app.providers import Ollama
+
+    kwargs = {
+        "model": "qwen3:4b",
+        "instructions": "Evalúa.",
+        "input": [{"role": "user", "content": "x"}],
+        "text": {"format": {"schema": {"type": "object"}}},
+    }
+    default = Ollama().payload(kwargs)
+    assert default["think"] is None and "temperature" not in default["options"]
+    monkeypatch.setattr(settings, "ollama_reasoning", "no_think_directive")
+    payload = Ollama().payload(kwargs)
+    assert payload["think"] is False
+    assert payload["messages"][0]["content"].endswith("/no_think")
+    assert payload["options"]["temperature"] == 0.7 and payload["options"]["top_k"] == 20
+    assert payload["format"] == {"type": "object"} and payload["options"]["seed"] == 42

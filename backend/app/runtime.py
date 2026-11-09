@@ -93,6 +93,7 @@ def _signature():
         settings.vector_dimensions,
         settings.embedding_revision,
         settings.ollama_num_ctx,
+        settings.ollama_reasoning,
     )
 
 

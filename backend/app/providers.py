@@ -160,6 +160,14 @@ class Ollama:
         }
         if kwargs.get("text"):
             payload["format"] = kwargs["text"]["format"]["schema"]
+        if settings.ollama_reasoning == "no_think_directive":
+            # Opt-in, measured alternative (VALIDATION.md, "Diagnóstico Qwen3"): disable
+            # the reasoning phase so the output budget is spent on the answer/JSON.
+            # Uses Qwen3's documented soft switch plus its recommended non-thinking
+            # sampling (temperature 0.7, top_p 0.8, top_k 20). Never greedy decoding.
+            payload["think"] = False
+            messages[0]["content"] = (messages[0]["content"] + "\n/no_think").strip()
+            payload["options"].update({"temperature": 0.7, "top_p": 0.8, "top_k": 20, "min_p": 0})
         return payload
 
     def result(self, data, content=None, calls=None, thinking_chars=None):
