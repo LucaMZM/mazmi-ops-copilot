@@ -460,8 +460,10 @@ def test_invalid_tool_args_never_persist(api, monkeypatch):
 
 
 def test_failed_index_has_status_and_no_chunks(api, monkeypatch):
+    from app import documents
+
     monkeypatch.setattr(
-        main, "embed_texts", lambda _: (_ for _ in ()).throw(RuntimeError("secret"))
+        documents, "embed_texts", lambda _: (_ for _ in ()).throw(RuntimeError("secret"))
     )
     assert (
         api.post(

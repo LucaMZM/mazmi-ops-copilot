@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     max_document_chunks: int = Field(default=2000, ge=1)
     cookie_secure: bool = False
     cors_origins: str = "http://localhost:3000"
+    # Database pool and server-side safety limits (see db.py).
+    db_pool_max: int = Field(default=10, ge=2, le=100)
+    db_pool_timeout_seconds: float = Field(default=10, gt=0, le=120)
+    db_statement_timeout_ms: int = Field(default=30000, ge=1000, le=600000)
+    db_idle_transaction_timeout_ms: int = Field(default=60000, ge=1000, le=600000)
+    # Model-backed chat turns admitted at once. Local inference on small machines
+    # should stay at 1; queued requests wait at most chat_queue_timeout_seconds.
+    chat_max_concurrent: int = Field(default=2, ge=1, le=32)
+    chat_queue_timeout_seconds: float = Field(default=20, ge=0, le=300)
     # Upper bound for one streamed chat turn, including queueing and inference.
     chat_stream_timeout_seconds: float = Field(default=330, ge=10, le=900)
 
