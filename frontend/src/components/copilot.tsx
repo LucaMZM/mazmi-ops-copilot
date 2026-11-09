@@ -22,7 +22,6 @@ import { KnowledgeView } from "./views/knowledge-view";
 import { ProviderContext, SettingsView } from "./views/settings-view";
 import { WorkspaceView } from "./views/workspace-view";
 import { useChat } from "@/hooks/use-chat";
-import { applyTheme } from "@/hooks/use-theme";
 import { useVoice } from "@/hooks/use-voice";
 import { useWorkspaceData, type ResourceName } from "@/hooks/use-workspace-data";
 import { ApiError, errorMessage, jsonBody, request } from "@/lib/api";
@@ -86,7 +85,6 @@ export function Copilot({
 
   useEffect(() => {
     mounted.current = true;
-    applyTheme();
     return () => {
       mounted.current = false;
     };
