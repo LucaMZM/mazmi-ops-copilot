@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     chat_queue_timeout_seconds: float = Field(default=20, ge=0, le=300)
     # Upper bound for one streamed chat turn, including queueing and inference.
     chat_stream_timeout_seconds: float = Field(default=330, ge=10, le=900)
+    # RAG pipeline revisions. The previous behaviour stays selectable so every change
+    # can be compared against its baseline (see backend/evals/v2-*.json).
+    chunking_strategy: Literal["structured_v2", "flat_v1"] = "structured_v2"
+    lexical_query_mode: Literal["any_terms_v2", "all_terms_v1"] = "any_terms_v2"
+    retrieval_max_chunks_per_document: int = Field(default=3, ge=1, le=20)
+    answer_style: Literal["focused_v5", "full_passages_v4"] = "focused_v5"
+    # Qwen3 reasoning control for Ollama. "model_default" is the historical behaviour.
+    ollama_reasoning: Literal["model_default", "no_think_directive"] = "model_default"
 
     @model_validator(mode="after")
     def guard_demo(self):

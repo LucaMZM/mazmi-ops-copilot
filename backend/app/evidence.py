@@ -211,16 +211,100 @@ def quote_text(text):
     return re.sub(r"\[(\d+)\]", r"〔\1〕", text)
 
 
+STOPWORDS = {
+    "como", "cual", "cuales", "cuando", "cuanto", "cuanta", "cuantos", "cuantas", "donde",
+    "para", "sobre", "desde", "hasta", "entre", "segun", "tiene", "tienen", "esta", "este",
+    "estos", "estas", "hay", "debe", "deben", "puede", "pueden", "que", "quien", "quienes",
+    "una", "uno", "unos", "unas", "los", "las", "del", "con", "sin", "por", "the", "what",
+    "how", "which", "when", "politica", "documento", "informacion",
+}
+# Sentences carrying these markers qualify a neighbouring statement; they are kept next
+# to any selected sentence so trimming can never drop an exception or a negation.
+QUALIFIER = re.compile(
+    r"\b(salvo|excepto|excepcion\w*|siempre que|solo|solamente|unicamente|no|nunca|sin embargo|"
+    r"ademas|en ese caso|en caso de|a menos que|condicion\w*|requiere\w*|debe\w*|"
+    r"except|unless|only|not|never)\b"
+)
+
+
+def _terms(text):
+    return {w[:5] for w in re.findall(r"[a-z0-9]+", normalize(text)) if len(w) > 2} - {
+        w[:5] for w in STOPWORDS
+    }
+
+
+def _units(text):
+    """Sentences, list items and table rows of a stored passage (heading lines dropped)."""
+    units = []
+    for line in text.split("\n"):
+        line = line.strip()
+        if not line or line.startswith("#") or re.fullmatch(r"\|?\s*:?-{3,}.*", line):
+            continue
+        if line.startswith("|") or re.match(r"(?:[-*•+]|\d+[.)])\s", line):
+            units.append(line)
+        else:
+            units.extend(u for u in re.split(r"(?<=[.!?])\s+", line) if u.strip())
+    return units
+
+
+def focused_quote(question, text, max_chars=700):
+    """Return verbatim sentences of ``text`` that address ``question``.
+
+    Deterministic and extractive: every returned fragment is a literal substring of the
+    stored passage; omitted spans are marked with " … ". Short passages are returned
+    whole. When no sentence shares vocabulary with the question (paraphrase), the whole
+    passage is returned rather than guessing.
+    """
+    units = _units(text)
+    body = " ".join(units)
+    if len(body) <= 240 or len(units) <= 2:
+        return body
+    wanted = _terms(question)
+    scores = [len(wanted & _terms(unit)) for unit in units]
+    best = max(scores)
+    if best == 0:
+        return body
+    keep = {i for i, score in enumerate(scores) if score >= max(1, (best + 1) // 2)}
+    for i in sorted(keep):
+        for j in (i - 1, i + 1):
+            if 0 <= j < len(units) and QUALIFIER.search(normalize(units[j])):
+                keep.add(j)
+    pieces, previous, total = [], None, 0
+    for i in sorted(keep):
+        if total + len(units[i]) > max_chars and pieces:
+            break
+        if previous is not None and i != previous + 1:
+            pieces.append("…")
+        pieces.append(units[i])
+        previous, total = i, total + len(units[i])
+    if min(keep) > 0:
+        pieces.insert(0, "…")
+    if previous is not None and previous < len(units) - 1:
+        pieces.append("…")
+    return " ".join(pieces)
+
+
+def _origin(source):
+    name = source.get("filename")
+    section = source.get("section")
+    if name and section:
+        return f"Según {name} ({section})"
+    if name:
+        return f"Según {name}"
+    return "Según la documentación"
+
+
 def documentary_answer(client, question, sources, history=None, emit=None):
     started = time.perf_counter()
     items = passages(sources)
+    focused = settings.answer_style == "focused_v5"
     meta = {
         "model": settings.generation_model,
         "input_tokens": 0,
         "output_tokens": 0,
         "tools": [],
         "citations": [],
-        "evidence_policy": "extractive_v4",
+        "evidence_policy": "extractive_v5_focused" if focused else "extractive_v4",
         "model_assessment_performed": False,
         "selected_passage_ids": [],
         "abstention_reason": None,
@@ -239,10 +323,19 @@ def documentary_answer(client, question, sources, history=None, emit=None):
         else:
             meta["selected_passage_ids"] = [p["id"] for p in selected]
             meta["citations"] = sorted({p["citation"] for p in selected})
-            # Whole retrieved passages preserve negations and qualifications. No free prose.
-            text = "Pasajes documentales seleccionados:\n\n" + "\n\n".join(
-                f"«{quote_text(p['text'])}» [{p['citation']}]" for p in selected
-            )
+            if focused:
+                # Literal sentences that address the question, with their origin. The
+                # full stored passage stays one click away in the evidence inspector.
+                text = "\n\n".join(
+                    f"{_origin(sources[p['id'] - 1])}:\n"
+                    f"«{quote_text(focused_quote(question, p['text']))}» [{p['citation']}]"
+                    for p in selected
+                )
+            else:
+                # Whole retrieved passages preserve negations and qualifications.
+                text = "Pasajes documentales seleccionados:\n\n" + "\n\n".join(
+                    f"«{quote_text(p['text'])}» [{p['citation']}]" for p in selected
+                )
         if emit:
             emit({"type": "delta", "text": text})
         return text, None, meta
