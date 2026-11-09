@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     max_document_chunks: int = Field(default=2000, ge=1)
     cookie_secure: bool = False
     cors_origins: str = "http://localhost:3000"
+    # Upper bound for one streamed chat turn, including queueing and inference.
+    chat_stream_timeout_seconds: float = Field(default=330, ge=10, le=900)
 
     @model_validator(mode="after")
     def guard_demo(self):
