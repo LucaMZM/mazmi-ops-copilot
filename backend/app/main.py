@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import time
 from collections.abc import Callable
 from io import BytesIO
 from pathlib import Path
-from queue import Empty, Queue
-from threading import Event, Thread
+from threading import Event
 from typing import Annotated
 from uuid import UUID, uuid4
 
@@ -46,6 +44,7 @@ from .schemas import (
     VoiceRequest,
 )
 from .speech import synthesize, transcribe
+from .streaming import StreamCancelled, sse_response
 
 app = FastAPI(title="MAZMI Ops Copilot API", version="0.1.0")
 app.add_middleware(
@@ -449,8 +448,41 @@ def chat(payload: ChatRequest, user: CurrentUser):
     return run_chat(payload, user)
 
 
-class ChatCancelled(RuntimeError):
+class ChatCancelled(StreamCancelled):
     pass
+
+
+def preflight_chat(payload: ChatRequest) -> bool:
+    """Validate a turn before any write or stream: returns True for model-free reads.
+
+    Exact, unfiltered ticket reads are answered from the database with zero model
+    calls, so they must not depend on a configured provider. Every other turn needs
+    the generation provider (and, for documentary questions, embeddings).
+    """
+    try:
+        tools = requested_tools(payload.message, payload.mode)
+        limit = explicit_ticket_limit(payload.message) if tools == [READ_TOOL] else None
+        direct_read = tools == [READ_TOOL] and (
+            direct_ticket_query(payload.message, limit) is not None
+        )
+    except TicketQueryError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if not direct_read:
+        require_provider()
+        if not tools:
+            require_provider("embedding")
+    return direct_read
+
+
+def check_conversation(conversation_id, user: Principal) -> None:
+    if conversation_id is None:
+        return
+    with get_conn() as conn:
+        if not conn.execute(
+            "SELECT 1 FROM conversations WHERE id=%s AND workspace_id=%s",
+            (conversation_id, user.workspace_id),
+        ).fetchone():
+            raise HTTPException(404, "Conversación no encontrada")
 
 
 def run_chat(
@@ -459,14 +491,7 @@ def run_chat(
     emit: Callable | None = None,
     cancelled: Event | None = None,
 ):
-    try:
-        direct_read = requested_tools(payload.message, payload.mode) == [READ_TOOL] and (
-            direct_ticket_query(payload.message, explicit_ticket_limit(payload.message)) is not None
-        )
-    except TicketQueryError as exc:
-        raise HTTPException(400, str(exc)) from exc
-    if not direct_read:
-        require_provider()
+    preflight_chat(payload)
     with get_conn() as conn:
         workspace_id = user.workspace_id
         conversation_id = str(payload.conversation_id) if payload.conversation_id else None
@@ -807,52 +832,18 @@ def conversation(conversation_id: UUID, user: CurrentUser):
 
 
 @app.post("/api/chat/stream")
-def stream_chat(payload: ChatRequest, user: CurrentUser, request: Request):
-    require_provider()
-    events: Queue = Queue()
-    cancelled = Event()
+async def stream_chat(payload: ChatRequest, user: CurrentUser, request: Request):
+    # Validation errors keep real HTTP status codes; only accepted turns stream.
+    await run_in_threadpool(preflight_chat, payload)
+    await run_in_threadpool(check_conversation, payload.conversation_id, user)
 
-    def emit(event):
-        if cancelled.is_set():
-            raise ChatCancelled("Cliente desconectado")
-        events.put(event)
+    def work(emit, cancelled):
+        return run_chat(payload, user, emit, cancelled).model_dump(mode="json")
 
-    def work():
-        try:
-            response = run_chat(payload, user, emit, cancelled)
-            emit({"type": "done", "data": response.model_dump()})
-        except ChatCancelled:
-            pass
-        except HTTPException as exc:
-            events.put({"type": "error", "message": str(exc.detail)})
-        except (OpenAIError, RuntimeError, ValueError, psycopg.Error) as exc:
-            logger.error("Chat failed: %s", type(exc).__name__)
-            events.put({"type": "error", "message": "No se pudo completar la respuesta"})
-        finally:
-            events.put(None)
-
-    Thread(target=work, daemon=True).start()
-
-    async def stream():
-        try:
-            while True:
-                if await request.is_disconnected():
-                    break
-                try:
-                    event = events.get_nowait()
-                except Empty:
-                    await asyncio.sleep(0.05)
-                    continue
-                if event is None:
-                    break
-                yield "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
-        finally:
-            # A synchronous provider call may finish before observing this flag.
-            # Checkpoints before writes roll back an abandoned chat transaction.
-            cancelled.set()
-
-    return StreamingResponse(
-        stream(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    return sse_response(
+        request,
+        work,
+        timeout=settings.chat_stream_timeout_seconds,
+        cancelled_exc=ChatCancelled,
+        initial=[{"type": "status", "stage": "accepted", "text": "Consulta recibida…"}],
     )
