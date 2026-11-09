@@ -155,7 +155,7 @@ test("demo state is clearly labeled without claiming a Gemini connection", async
     ),
   );
   mount();
-  await screen.findByText("DEMO DE DESARROLLO");
+  await screen.findByText("Demo de desarrollo");
   expect(
     screen.getByText(/IA simulada · Sin conexión con Gemini/),
   ).toBeInTheDocument();
@@ -364,7 +364,7 @@ test("approvals view rejection is explicit and never becomes executed", async ()
   nav("Aprobaciones");
   await screen.findByText("Validar acceso");
   expect(
-    screen.getByText("PROPUESTA · TODAVÍA NO EJECUTADA"),
+    screen.getByText("Propuesta sin ejecutar"),
   ).toBeInTheDocument();
   fireEvent.click(screen.getByText("Rechazar"));
   await waitFor(() =>
@@ -436,8 +436,10 @@ test("loading history from Knowledge never claims document indexing", async () =
   mount();
   nav("Knowledge");
   fireEvent.click(await screen.findByText("Historial pendiente"));
-  expect(screen.getByText("Añade contexto a tu equipo")).toBeInTheDocument();
+  // v2 switches to Copilot immediately and shows the real operation in progress.
+  expect(await screen.findByText("Cargando la conversación…")).toBeInTheDocument();
   expect(screen.queryByText("Procesando documento…")).not.toBeInTheDocument();
+  expect(screen.queryByText(/indexando/i)).not.toBeInTheDocument();
 });
 
 test("a failed document inspector explains the absence of chunks", async () => {
@@ -596,7 +598,7 @@ test("demo chat labels simulation rather than a real local model", async () => {
     Response.json(String(input) === "/api/system" ? { ...ollamaSystem, demo: true } : fetchBase(String(input))),
   );
   mount();
-  await screen.findByText("DEMO DE DESARROLLO");
+  await screen.findByText("Demo de desarrollo");
   nav("Copilot");
   expect(screen.getByLabelText("Proveedor de la consulta")).toHaveTextContent("DEMO · IA simulada");
   expect(screen.getByLabelText("Proveedor de la consulta")).not.toHaveTextContent("prueba local completada");
