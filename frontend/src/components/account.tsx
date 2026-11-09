@@ -1,6 +1,9 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
+import { Layers, Quote, ShieldCheck } from "lucide-react";
 import { Copilot } from "./copilot";
+import { Spinner } from "./product-ui";
+import { applyTheme } from "@/hooks/use-theme";
 
 export type Account = {
   email: string;
@@ -19,6 +22,7 @@ export function AccountGate() {
     setAccount(await r.json());
   }
   useEffect(() => {
+    applyTheme();
     let active = true;
     fetch("/api/auth/me")
       .then(async (r) => {
@@ -85,7 +89,10 @@ export function AccountGate() {
   if (checking)
     return (
       <main className="authLoading">
-        <p>Conectando con MAZMI…</p>
+        <div className="backdropScene" aria-hidden="true" />
+        <p role="status">
+          <Spinner /> Conectando con MAZMI…
+        </p>
       </main>
     );
   if (account)
@@ -99,83 +106,93 @@ export function AccountGate() {
     );
   return (
     <main className="authScreen">
+      <div className="backdropScene" aria-hidden="true" />
       <section className="authStory">
-        <span className="wordmark">MAZMI SYSTEMS / OPS COPILOT</span>
-        <div>
-          <h2>
-            El conocimiento
-            <br />
-            tiene consecuencias.
-            <br />
-            Tú decides cuáles.
-          </h2>
-          <p>
-            Un espacio de trabajo para consultar evidencia, preparar acciones y
-            conservar el contexto de cada decisión.
-          </p>
+        <div className="brand">
+          <span className="brandmark" aria-hidden="true">
+            M
+          </span>
+          <div>
+            <b>MAZMI</b>
+            <small>Ops Copilot</small>
+          </div>
         </div>
-        <small>CONOCIMIENTO · CRITERIO · CONTROL</small>
+        <h2>El conocimiento de tu equipo, con pruebas y bajo tu control.</h2>
+        <p>
+          Pregunta a vuestros documentos y verifica cada cita. Prepara acciones operativas que
+          solo se ejecutan cuando una persona las confirma.
+        </p>
+        <ul className="authPrinciples">
+          <li>
+            <Quote size={18} aria-hidden="true" />
+            <span>
+              <strong>Respuestas citadas.</strong> Frases literales de tus documentos o una
+              abstención explícita, nunca datos inventados.
+            </span>
+          </li>
+          <li>
+            <ShieldCheck size={18} aria-hidden="true" />
+            <span>
+              <strong>Aprobación humana.</strong> Cada acción es una propuesta hasta que la
+              confirmas, y queda registrada.
+            </span>
+          </li>
+          <li>
+            <Layers size={18} aria-hidden="true" />
+            <span>
+              <strong>Espacios aislados.</strong> Documentos, conversaciones y decisiones
+              separados por workspace.
+            </span>
+          </li>
+        </ul>
       </section>
-      <div className="authFormWrap">
-        <form className="authPanel" onSubmit={submit}>
-          <small>MAZMI / OPS COPILOT</small>
-          <h1>
-            {register
-              ? "Crea tu espacio de trabajo"
-              : "Tu conocimiento. Tus decisiones."}
-          </h1>
-          <p>Documentos, respuestas con fuentes y acciones bajo tu control.</p>
-          {error && (
-            <div role="alert" className="errorBanner">
-              {error}
-            </div>
-          )}
+      <form className="authPanel glass" onSubmit={submit}>
+        <h1>{register ? "Crea tu espacio de trabajo" : "Inicia sesión"}</h1>
+        <p>
+          {register
+            ? "La contraseña necesita al menos 12 caracteres."
+            : "Accede a los documentos y decisiones de tus workspaces."}
+        </p>
+        {error && (
+          <div role="alert" className="errorBanner">
+            {error}
+          </div>
+        )}
+        <label>
+          Email
+          <input name="email" type="email" required autoComplete="username" maxLength={254} />
+        </label>
+        <label>
+          Contraseña
+          <input
+            name="password"
+            type="password"
+            minLength={12}
+            maxLength={128}
+            required
+            autoComplete={register ? "new-password" : "current-password"}
+          />
+        </label>
+        {register && (
           <label>
-            Email
-            <input
-              name="email"
-              type="email"
-              required
-              autoComplete="username"
-              maxLength={254}
-            />
+            Workspace
+            <input name="workspace" required maxLength={100} placeholder="Tu empresa o equipo" />
           </label>
-          <label>
-            Contraseña
-            <input
-              name="password"
-              type="password"
-              minLength={12}
-              maxLength={128}
-              required
-              autoComplete={register ? "new-password" : "current-password"}
-            />
-          </label>
-          {register && (
-            <label>
-              Workspace
-              <input
-                name="workspace"
-                required
-                maxLength={100}
-                placeholder="Tu empresa o equipo"
-              />
-            </label>
-          )}
-          <button disabled={busy} className="primary">
-            {busy ? "Conectando…" : register ? "Crear cuenta" : "Entrar"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setRegister(!register);
-              setError("");
-            }}
-          >
-            {register ? "Ya tengo cuenta" : "Crear cuenta y workspace"}
-          </button>
-        </form>
-      </div>
+        )}
+        <button disabled={busy} className="primary">
+          {busy ? "Conectando…" : register ? "Crear cuenta" : "Entrar"}
+        </button>
+        <button
+          type="button"
+          className="textButton"
+          onClick={() => {
+            setRegister(!register);
+            setError("");
+          }}
+        >
+          {register ? "Ya tengo cuenta" : "Crear cuenta y workspace"}
+        </button>
+      </form>
     </main>
   );
 }

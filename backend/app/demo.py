@@ -7,9 +7,13 @@ import json
 import re
 import secrets
 from contextlib import contextmanager
+from pathlib import Path
 from types import SimpleNamespace as NS
 
 from .config import settings
+
+# Documented keyword fixtures: the demo "assessor" only recognises these topics.
+DEMO_TOPICS = ("vacaciones", "inventario", "acceso", "gastos", "teletrabajo", "contraseñas")
 
 
 def vector(text, dimensions):
@@ -47,7 +51,7 @@ class DemoProvider:
         if kwargs.get("text"):
             data = json.loads(inputs[-1]["content"])
             question = data["question"].lower()
-            topics = [t for t in ("vacaciones", "acceso", "gastos") if t in question]
+            topics = [t for t in DEMO_TOPICS if t in question]
             ids = [p["id"] for p in data["passages"] if topics and topics[0] in p["text"].lower()]
             unsupported = any(w in question for w in ("salario", "marte", "despido", "contraseña"))
             text = json.dumps(
@@ -121,17 +125,26 @@ def seed():
             },
         )
         r.raise_for_status()
-        for name, text in {
-            "Politica-de-vacaciones.md": "# Vacaciones\nLas vacaciones anuales son 25 días laborables. La solicitud de vacaciones requiere aprobación de la persona responsable con 10 días de antelación.",
-            "Protocolo-de-acceso.txt": "El acceso al entorno de operaciones requiere aprobación humana. El acceso se solicita mediante un ticket interno y se registra en auditoría. Nunca compartas contraseñas.",
-            "Guia-de-gastos.md": "Los gastos de viaje necesitan justificante y aprobación previa. El límite de gastos por comida es de 25 euros por persona.",
-        }.items():
-            api.post(
-                "/api/documents", files={"file": (name, text.encode(), "text/plain")}
-            ).raise_for_status()
+        corpus = json.loads(
+            (Path(__file__).resolve().parents[1] / "evals/v2_retrieval_corpus.json").read_text()
+        )
+        demo_files = {
+            "manual-del-empleado.md",
+            "politica-de-gastos.md",
+            "seguridad-y-accesos.md",
+            "inventario-almacenes.md",
+            "teletrabajo.md",
+        }
+        for doc in corpus["documents"]:
+            if doc["filename"] in demo_files:
+                api.post(
+                    "/api/documents",
+                    files={"file": (doc["filename"], doc["text"].encode(), "text/markdown")},
+                ).raise_for_status()
         api.post("/api/documents", files={"file": ("Documento-sin-texto.txt", b"", "text/plain")})
         for question, mode in [
             ("¿Cuántos días de vacaciones hay?", "ASK"),
+            ("¿Qué restricciones hay durante la campaña de inventario de diciembre?", "ASK"),
             ("¿Cuál es el salario durante las vacaciones?", "ASK"),
             ("Crea un ticket para revisar acceso", "DO"),
         ]:

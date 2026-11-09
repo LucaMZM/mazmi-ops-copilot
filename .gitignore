@@ -47,3 +47,6 @@ backups/
 *.swp
 .auth/
 playwright/.auth/
+
+# Local browser-automation output
+.playwright-mcp/

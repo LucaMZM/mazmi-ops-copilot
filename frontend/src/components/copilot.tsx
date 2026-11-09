@@ -1,96 +1,41 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Account } from "./account";
-import { readChatStream } from "./stream";
-import { FormEvent, useEffect, useRef, useState } from "react";
-import {
-  Bot,
-  FileText,
-  Mic,
-  Send,
-  ShieldCheck,
-  Square,
-  Volume2,
-  VolumeX,
-  LayoutGrid,
-  Settings2,
-  History,
-  Plus,
-  ArrowUpRight,
-  LogOut,
-  PanelLeftClose,
-  Menu,
-  LoaderCircle,
-} from "lucide-react";
 import type {
-  DocumentItem,
-  Activity,
-  Conversation,
-  Source,
-  PendingAction,
-  Message,
-  SystemInfo,
-  View,
+  ChatResult,
   ChunkPage,
+  DocumentItem,
+  Mode,
+  PendingAction,
+  Source,
+  View,
 } from "./product-types";
-import {
-  ActionCard,
-  EmptyState,
-  AnswerText,
-  Inspector,
-  Insufficient,
-  SourceChip,
-} from "./product-ui";
-import {
-  WorkspaceView,
-  KnowledgeView,
-  ApprovalsView,
-  ActivityView,
-  SettingsView,
-  ProviderContext,
-} from "./product-views";
+import { EmptyState, Inspector, Spinner } from "./product-ui";
+import { ChatView } from "./chat/chat-view";
+import type { ComposerHandle } from "./chat/composer";
+import { NAV_ITEMS, Sidebar } from "./layout/sidebar";
+import { Topbar } from "./layout/topbar";
+import { ActivityView } from "./views/activity-view";
+import { ApprovalsView } from "./views/approvals-view";
+import { KnowledgeView } from "./views/knowledge-view";
+import { ProviderContext, SettingsView } from "./views/settings-view";
+import { WorkspaceView } from "./views/workspace-view";
+import { useChat } from "@/hooks/use-chat";
+import { useVoice } from "@/hooks/use-voice";
+import { useWorkspaceData, type ResourceName } from "@/hooks/use-workspace-data";
+import { ApiError, errorMessage, jsonBody, request } from "@/lib/api";
 
-const API = "";
-const providerConfiguration = (config: SystemInfo | null) =>
-  config
-    ? JSON.stringify([
-        config.demo,
-        config.generation.provider,
-        config.generation.model,
-        config.embeddings.provider,
-        config.embeddings.model,
-        config.embeddings.dimensions,
-      ])
-    : "";
-const errorMessage = (error: unknown) => {
-  const value =
-    typeof error === "object" && error !== null
-      ? (error as { name?: unknown; message?: unknown })
-      : null;
-  if (value?.name === "AbortError")
-    return "Consulta detenida. Revisa el historial antes de repetir una acción.";
-  if (value?.name === "TimeoutError")
-    return "El servidor tardó demasiado. Revisa el historial antes de repetir una acción; podría haberse completado.";
-  return typeof value?.message === "string"
-    ? value.message
-    : "Error inesperado";
+const VIEW_RESOURCES: Record<View, ResourceName[]> = {
+  Workspace: ["actions", "activity", "documents", "conversations"],
+  Copilot: [],
+  Knowledge: ["documents"],
+  Approvals: ["actions"],
+  Activity: ["activity"],
+  Settings: ["system"],
 };
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
-    ...init,
-    signal: init?.signal ?? AbortSignal.timeout(90000),
-  });
-  if (!response.ok) {
-    const data = await response.json().catch(() => null);
-    throw new Error(
-      typeof data?.detail === "string"
-        ? data.detail
-        : `Solicitud fallida (${response.status})`,
-    );
-  }
-  return response.json() as Promise<T>;
-}
 
+/** Workspace shell. Remounted per workspace by AccountGate, so state never crosses workspaces. */
 export function Copilot({
   account,
   onSignOut,
@@ -100,370 +45,160 @@ export function Copilot({
   onSignOut: () => Promise<void>;
   onWorkspace: (id: string) => Promise<void>;
 }) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [system, setSystem] = useState<SystemInfo | null>(null);
+  const data = useWorkspaceData();
+  const { refresh, setActions, setConversations, setSystem } = data;
+  const [view, setView] = useState<View>("Workspace");
+  const [viewBusy, setViewBusy] = useState(false);
+  const viewRequest = useRef(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [mode, setMode] = useState<Mode>("ASK");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [deciding, setDeciding] = useState<string | null>(null);
+  const decisionRef = useRef(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [reindexing, setReindexing] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [checkingLocal, setCheckingLocal] = useState(false);
   const [localCheckError, setLocalCheckError] = useState("");
   const localCheckRequest = useRef(false);
-  const [actions, setActions] = useState<PendingAction[]>([]);
-  const [viewBusy, setViewBusy] = useState(false);
-  const viewRequest = useRef(0);
-  const [initialLoading, setInitialLoading] = useState(true);
   const [inspected, setInspected] = useState<Source | null>(null);
-  const [chunkPage, setChunkPage] = useState<ChunkPage | null>(null);
   const [inspectDoc, setInspectDoc] = useState<DocumentItem | null>(null);
+  const [chunkPage, setChunkPage] = useState<ChunkPage | null>(null);
   const [inspectBusy, setInspectBusy] = useState(false);
   const [inspectError, setInspectError] = useState("");
-  const chatRequest = useRef<AbortController | null>(null);
-  const recordingCancelled = useRef(false);
-  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const audioRequest = useRef<AbortController | null>(null);
-  const followScroll = useRef(true);
-  const [retry, setRetry] = useState("");
-  const [streamStatus, setStreamStatus] = useState("");
-  const submitting = useRef(false);
-  const [input, setInput] = useState("");
-  const [mode, setMode] = useState<"ASK" | "DO">("ASK");
-  const [voice, setVoice] = useState(false);
-  const [audioStatus, setAudioStatus] = useState("");
-  const [listening, setListening] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [streaming, setStreaming] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const [view, setView] = useState<View>("Workspace");
-  const [activity, setActivity] = useState<Activity[]>([]);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [error, setError] = useState("");
-  const [deciding, setDeciding] = useState<string | null>(null);
-  const decisionRef = useRef(false);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const mediaRef = useRef<MediaStream | null>(null);
-  const mountedRef = useRef(true);
-  const [reindexing, setReindexing] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioUrlRef = useRef<string | null>(null);
-  const voiceRef = useRef(false);
+  const composer = useRef<ComposerHandle>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const endRef = useRef<HTMLDivElement>(null);
+  const mounted = useRef(true);
 
-  const refreshDocs = async () => {
-    setDocuments(await request<DocumentItem[]>("/api/documents"));
-  };
+  const voice = useVoice(setError);
+  const { speak } = voice;
+  const onSettled = useCallback(
+    (result: ChatResult | null) => {
+      refresh("conversations", "actions").catch((err) => setError(errorMessage(err)));
+      if (result) void speak(result.answer);
+    },
+    [refresh, speak],
+  );
+  const chat = useChat({ onSettled });
+
   useEffect(() => {
-    let active = true;
-    mountedRef.current = true;
-    const requests = [
-      request<DocumentItem[]>("/api/documents"),
-      request<Conversation[]>("/api/conversations"),
-      request<SystemInfo>("/api/system"),
-      request<PendingAction[]>("/api/actions"),
-      request<Activity[]>("/api/activity"),
-    ] as const;
-    Promise.allSettled(requests).then((results) => {
-      if (!active) return;
-      const [docs, chats, config, pending, events] = results;
-      if (docs.status === "fulfilled") setDocuments(docs.value);
-      if (chats.status === "fulfilled") setConversations(chats.value);
-      if (config.status === "fulfilled" && config.value.generation)
-        setSystem(config.value);
-      if (pending.status === "fulfilled") setActions(pending.value);
-      if (events.status === "fulfilled") setActivity(events.value);
-      const failure = results.find((r) => r.status === "rejected");
-      if (failure?.status === "rejected")
-        setError(errorMessage(failure.reason));
-      setInitialLoading(false);
-    });
+    mounted.current = true;
     return () => {
-      active = false;
-      mountedRef.current = false;
-      recordingCancelled.current = true;
-      chatRequest.current?.abort();
-      mediaRef.current?.getTracks().forEach((t) => t.stop());
-      recorderRef.current?.state === "recording" && recorderRef.current.stop();
-      audioRequest.current?.abort();
-      audioRef.current?.pause();
-      if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+      mounted.current = false;
     };
   }, []);
+
+  // While a synchronous upload runs, reflect server-side status changes in Knowledge.
   useEffect(() => {
-    if (!loading || view !== "Knowledge") return;
-    const timer = setInterval(() => {
-      request<DocumentItem[]>("/api/documents")
-        .then(setDocuments)
-        .catch(() => {});
-    }, 1500);
+    if (!uploading || view !== "Knowledge") return;
+    const timer = setInterval(() => refresh("documents").catch(() => {}), 1500);
     return () => clearInterval(timer);
-  }, [loading, view]);
-  async function changeView(next: View) {
-    const version = ++viewRequest.current;
-    setView(next);
-    setMenuOpen(false);
-    setError("");
-    setNotice("");
-    if (next === "Copilot") {
-      setViewBusy(false);
-      return;
-    }
-    setViewBusy(true);
-    try {
-      const updates: Promise<void>[] = [];
-      if (next === "Approvals" || next === "Workspace")
-        updates.push(request<PendingAction[]>("/api/actions").then(setActions));
-      if (next === "Activity" || next === "Workspace")
-        updates.push(request<Activity[]>("/api/activity").then(setActivity));
-      if (next === "Knowledge")
-        updates.push(
-          request<DocumentItem[]>("/api/documents").then(setDocuments),
-        );
-      if (next === "Settings")
-        updates.push(
-          request<SystemInfo>("/api/system").then((config) => {
-            if (config.generation) setSystem(config);
-          }),
-        );
-      await Promise.all(updates);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      if (viewRequest.current === version) setViewBusy(false);
-    }
-  }
-  async function checkLocalProvider() {
-    if (
-      localCheckRequest.current ||
-      !system ||
-      system.demo ||
-      system.generation.provider !== "ollama" ||
-      system.embeddings.provider !== "ollama"
-    )
-      return;
-    const startedConfiguration = providerConfiguration(system);
-    localCheckRequest.current = true;
-    setCheckingLocal(true);
-    setLocalCheckError("");
-    try {
-      const checked = await request<SystemInfo>("/api/system/check-local", {
-        method: "POST",
-        signal: AbortSignal.timeout(300_000),
-      });
-      if (mountedRef.current && checked.generation) {
-        setSystem((current) =>
-          providerConfiguration(current) === startedConfiguration
-            ? checked
-            : current,
-        );
-      }
-    } catch (err) {
-      if (mountedRef.current) {
-        const timedOut = err instanceof Error && err.name === "TimeoutError";
-        setLocalCheckError(
-          timedOut
-            ? "La espera de la prueba ha terminado; el backend puede seguir procesándola. Actualiza el estado antes de volver a verificar."
-            : `${errorMessage(err)} Comprueba el servicio Ollama y los modelos; actualiza el estado antes de repetir la prueba.`,
-        );
-      }
-    } finally {
-      localCheckRequest.current = false;
-      if (mountedRef.current) setCheckingLocal(false);
-    }
-  }
-  async function openConversation(id: string) {
-    if (loading || deciding) return;
-    setLoading(true);
-    setError("");
-    try {
-      const data = await request<{
-        messages: Message[];
-        pending_actions: PendingAction[];
-      }>(`/api/conversations/${id}`);
-      setMessages([
-        ...data.messages,
-        ...data.pending_actions.map((pending) => ({
-          role: "assistant" as const,
-          content: "Acción pendiente de confirmación.",
-          pending,
-        })),
-      ]);
-      setConversationId(id);
-      setView("Copilot");
+  }, [uploading, view, refresh]);
+
+  const locked = chat.busy !== "idle" || !!deciding || !!deleting || !!reindexing || uploading;
+  const workspaceName =
+    account.workspaces.find((w) => w.id === account.workspace_id)?.name ?? "Workspace";
+  const pendingCount = data.actions.filter((a) => a.status === "PENDING").length;
+  const conversationTitle =
+    data.conversations.find((c) => c.id === chat.conversationId)?.title ?? null;
+
+  const changeView = useCallback(
+    async (next: View) => {
+      const version = ++viewRequest.current;
+      setView(next);
       setMenuOpen(false);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-  function stopAudio() {
-    setAudioStatus("");
-    audioRequest.current?.abort();
-    audioRequest.current = null;
-    audioRef.current?.pause();
-    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
-    audioUrlRef.current = null;
-    audioRef.current = null;
-  }
+      setError("");
+      setNotice("");
+      const resources = VIEW_RESOURCES[next];
+      if (!resources.length) {
+        setViewBusy(false);
+        return;
+      }
+      setViewBusy(true);
+      try {
+        await refresh(...resources);
+      } catch (err) {
+        if (mounted.current) setError(errorMessage(err));
+      } finally {
+        if (mounted.current && viewRequest.current === version) setViewBusy(false);
+      }
+    },
+    [refresh],
+  );
 
-  useEffect(() => {
-    if (followScroll.current)
-      endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  const openConversation = useCallback(
+    async (id: string) => {
+      if (deciding) return;
+      setMenuOpen(false);
+      setView("Copilot");
+      await chat.open(id);
+    },
+    [chat, deciding],
+  );
 
-  async function speak(text: string) {
-    if (!voiceRef.current) return;
-    try {
-      stopAudio();
-      const controller = new AbortController();
-      audioRequest.current = controller;
-      setAudioStatus("Generando audio…");
-      const r = await fetch(`${API}/api/voice/speak`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({ text: text.slice(0, 3800) }),
-      });
-      if (!r.ok)
-        throw new Error(
-          "No se pudo generar el audio. La respuesta escrita sigue disponible.",
-        );
-      const blob = await r.blob();
-      if (!voiceRef.current || controller.signal.aborted) return;
-      const url = URL.createObjectURL(blob);
-      audioUrlRef.current = url;
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = stopAudio;
-      audio.onerror = () => {
-        stopAudio();
-        setError("No se pudo reproducir el audio");
-      };
-      await audio.play();
-      setAudioStatus("Reproduciendo voz de IA…");
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") return;
-      stopAudio();
-      setError(errorMessage(err));
-    }
-  }
-
-  async function submit(e?: FormEvent) {
-    e?.preventDefault();
-    const text = input.trim();
-    if (!text || loading || submitting.current || deciding) return;
-    followScroll.current = true;
-    stopAudio();
-    recordingCancelled.current = true;
-    recorderRef.current?.state === "recording" && recorderRef.current.stop();
-    submitting.current = true;
+  const newConversation = useCallback(() => {
+    chat.reset();
+    setMenuOpen(false);
+    setView("Copilot");
     setError("");
-    setRetry("");
-    setInput("");
-    setLoading(true);
-    setStreamStatus("Buscando fuentes…");
-    setStreaming(true);
-    setMessages((m) => [
-      ...m,
-      { role: "user", content: text },
-      { role: "assistant", content: "" },
-    ]);
-    const controller = new AbortController();
-    chatRequest.current = controller;
-    const timeout = setTimeout(() => controller.abort(), 300000);
-    let answer = "";
+  }, [chat]);
+
+  const send = useCallback(
+    (text: string) => {
+      if (deciding || chat.busy !== "idle") return Promise.resolve(false);
+      setError("");
+      setNotice("");
+      voice.stopAudio();
+      voice.cancelRecording();
+      return chat.send(text, mode);
+    },
+    [chat, deciding, mode, voice],
+  );
+
+  async function decide(action: PendingAction, approved: boolean) {
+    if (decisionRef.current) return;
+    decisionRef.current = true;
+    setDeciding(action.id);
+    setError("");
     try {
-      const response = await fetch("/api/chat/stream", {
-        signal: controller.signal,
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          conversation_id: conversationId,
-          mode,
-        }),
-      });
-      await readChatStream<{
-        conversation_id: string;
-        answer: string;
-        sources: Source[];
-        pending_action: PendingAction | null;
-      }>(response, (event) => {
-        if (event.type === "delta") {
-          setStreamStatus("Generando respuesta…");
-          setMessages((m) =>
-            m.map((item, i) =>
-              i === m.length - 1
-                ? { ...item, content: item.content + event.text }
-                : item,
-            ),
-          );
-        }
-        if (event.type === "status") setStreamStatus(event.text);
-        if (event.type === "done") {
-          const data = event.data;
-          answer = data.answer;
-          setConversationId(data.conversation_id);
-          setMessages((m) =>
-            m.map((item, i) =>
-              i === m.length - 1
-                ? {
-                    role: "assistant",
-                    content: data.answer,
-                    sources: data.sources,
-                    pending: data.pending_action ?? undefined,
-                  }
-                : item,
-            ),
-          );
-        }
-      });
-      request<Conversation[]>("/api/conversations")
-        .then(setConversations)
-        .catch((err) => setError(errorMessage(err)));
-      request<PendingAction[]>("/api/actions")
-        .then(setActions)
-        .catch((err) => setError(errorMessage(err)));
-      void speak(answer);
-    } catch (err) {
-      setError(errorMessage(err));
-      setRetry(text);
-      setMessages((m) =>
-        m.map((item, i) =>
-          i === m.length - 1
-            ? {
-                role: "assistant",
-                failed: true,
-                content:
-                  "La respuesta no se completó. Revisa el historial antes de repetir una acción.",
-              }
-            : item,
+      const d = await request<{ status: string; ticket?: { id: number; title: string } }>(
+        `/api/actions/${action.id}/decision`,
+        jsonBody({ approved }),
+      );
+      setActions((current) =>
+        current.map((a) =>
+          a.id === action.id
+            ? { ...a, status: d.status === "executed" ? "EXECUTED" : "REJECTED" }
+            : a,
         ),
       );
+      chat.resolveAction(
+        action.id,
+        d.status === "executed" && d.ticket
+          ? `Acción ejecutada. Ticket #${d.ticket.id}: ${d.ticket.title}.`
+          : "Acción rechazada. No se ejecutó.",
+      );
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        // Already decided elsewhere (double click, retry, another tab): show the truth.
+        setNotice(`${err.message} Se ha actualizado la lista con el estado real.`);
+        refresh("actions").catch(() => {});
+      } else setError(errorMessage(err));
     } finally {
-      clearTimeout(timeout);
-      chatRequest.current = null;
-      submitting.current = false;
-      setStreaming(false);
-      setLoading(false);
-      setStreamStatus("");
+      decisionRef.current = false;
+      setDeciding(null);
     }
   }
 
   async function removeDocument(id: string) {
-    if (deleting) return;
-    if (
-      !window.confirm(
-        "¿Eliminar este documento y todos sus fragmentos indexados?",
-      )
-    )
+    if (deleting || !window.confirm("¿Eliminar este documento y todos sus fragmentos indexados?"))
       return;
     setDeleting(id);
     try {
       await request(`/api/documents/${id}`, { method: "DELETE" });
-      await refreshDocs();
+      await refresh("documents");
       setNotice("Documento eliminado del conocimiento del workspace.");
     } catch (err) {
       setError(errorMessage(err));
@@ -473,7 +208,7 @@ export function Copilot({
   }
 
   async function upload(file: File) {
-    if (loading) return;
+    if (uploading) return;
     if (!/\.(pdf|docx|txt|md)$/i.test(file.name)) {
       setError("Formato no admitido. Usa PDF, DOCX, TXT o MD.");
       return;
@@ -489,116 +224,30 @@ export function Copilot({
     setError("");
     setNotice("");
     setView("Knowledge");
-    setStreamStatus("Subiendo e indexando el documento…");
-    const fd = new FormData();
-    fd.append("file", file);
+    const form = new FormData();
+    form.append("file", file);
     setUploading(true);
-    setLoading(true);
     try {
-      const r = await fetch(`${API}/api/documents`, {
-        signal: AbortSignal.timeout(300000),
+      const d = await request<{ filename: string; chunks: number }>("/api/documents", {
         method: "POST",
-        body: fd,
+        body: form,
+        signal: AbortSignal.timeout(300_000),
       });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.detail || "Error al indexar");
       setNotice(
         `${d.filename} indexado: ${d.chunks} ${d.chunks === 1 ? "fragmento disponible" : "fragmentos disponibles"}.`,
       );
-      await refreshDocs();
     } catch (err) {
       setError(`No pude indexar el documento: ${errorMessage(err)}`);
     } finally {
-      setLoading(false);
-      setStreamStatus("");
       setUploading(false);
-      refreshDocs().catch((err) => setError(errorMessage(err)));
-    }
-  }
-
-  async function listen() {
-    if (listening) {
-      if (recorderRef.current?.state === "recording")
-        recorderRef.current.stop();
-      else {
-        recordingCancelled.current = true;
-        setListening(false);
-      }
-      return;
-    }
-    if (
-      !navigator.mediaDevices?.getUserMedia ||
-      typeof MediaRecorder === "undefined"
-    ) {
-      setError(
-        "Grabación no disponible. Usa un navegador compatible en localhost o HTTPS; puedes seguir escribiendo.",
-      );
-      return;
-    }
-    recordingCancelled.current = false;
-    setListening(true);
-    setError("");
-    try {
-      const media = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (!mountedRef.current || recordingCancelled.current) {
-        media.getTracks().forEach((t) => t.stop());
-        return;
-      }
-      mediaRef.current = media;
-      const recorder = new MediaRecorder(media);
-      recorderRef.current = recorder;
-      const chunks: BlobPart[] = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size) chunks.push(e.data);
-      };
-      const timer = setTimeout(() => {
-        if (recorder.state === "recording") recorder.stop();
-      }, 60000);
-      recorder.onerror = () => {
-        clearTimeout(timer);
-        media.getTracks().forEach((t) => t.stop());
-        setListening(false);
-        setError("No se pudo grabar el audio. Puedes seguir escribiendo.");
-      };
-      recorder.onstop = async () => {
-        clearTimeout(timer);
-        media.getTracks().forEach((t) => t.stop());
-        if (!mountedRef.current || recordingCancelled.current) return;
-        setListening(false);
-        try {
-          const form = new FormData();
-          form.append(
-            "file",
-            new Blob(chunks, { type: recorder.mimeType }),
-            "recording.webm",
-          );
-          const result = await request<{ text: string }>(
-            "/api/voice/transcribe",
-            { method: "POST", body: form },
-          );
-          if (mountedRef.current) setInput(result.text);
-        } catch (err) {
-          if (mountedRef.current) setError(errorMessage(err));
-        }
-      };
-      recorder.start();
-    } catch (err) {
-      setListening(false);
-      mediaRef.current?.getTracks().forEach((t) => t.stop());
-      setError(
-        err instanceof Error && err.name === "NotAllowedError"
-          ? "Permiso de micrófono denegado. Puedes seguir escribiendo."
-          : errorMessage(err),
-      );
+      refresh("documents").catch((err) => setError(errorMessage(err)));
     }
   }
 
   async function reindex(id: string) {
     if (
       reindexing ||
-      !window.confirm(
-        "¿Reindexar este documento con el proveedor y modelo de embeddings configurados?",
-      )
+      !window.confirm("¿Reindexar este documento con el proveedor y modelo de embeddings configurados?")
     )
       return;
     setReindexing(id);
@@ -606,9 +255,9 @@ export function Copilot({
     try {
       await request(`/api/documents/${id}/reindex`, {
         method: "POST",
-        signal: AbortSignal.timeout(300000),
+        signal: AbortSignal.timeout(300_000),
       });
-      await refreshDocs();
+      await refresh("documents");
       setNotice("Documento reindexado con el modelo configurado.");
     } catch (err) {
       setError(errorMessage(err));
@@ -617,569 +266,279 @@ export function Copilot({
     }
   }
 
-  async function decide(action: PendingAction, approved: boolean) {
-    if (decisionRef.current) return;
-    decisionRef.current = true;
-    setDeciding(action.id);
-    setError("");
-    try {
-      const d = await request<{
-        status: string;
-        ticket?: { id: number; title: string };
-      }>(`/api/actions/${action.id}/decision`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approved }),
-      });
-      setActions((current) =>
-        current.map((a) =>
-          a.id === action.id
-            ? {
-                ...a,
-                status: d.status === "executed" ? "EXECUTED" : "REJECTED",
-              }
-            : a,
-        ),
-      );
-      setMessages((m) => [
-        ...m.map((item) =>
-          item.pending?.id === action.id
-            ? { ...item, pending: undefined }
-            : item,
-        ),
-        {
-          role: "assistant",
-          content:
-            d.status === "executed" && d.ticket
-              ? `Acción ejecutada. Ticket #${d.ticket.id}: ${d.ticket.title}.`
-              : "Acción rechazada. No se ejecutó.",
-        },
-      ]);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      decisionRef.current = false;
-      setDeciding(null);
-    }
-  }
-
   async function createWorkspace(name: string) {
     if (creatingWorkspace) return;
     setCreatingWorkspace(true);
     setError("");
     try {
-      const created = await request<{ id: string }>("/api/auth/workspaces", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
+      const created = await request<{ id: string }>("/api/auth/workspaces", jsonBody({ name }));
       await onWorkspace(created.id);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
-      setCreatingWorkspace(false);
+      if (mounted.current) setCreatingWorkspace(false);
     }
   }
+
+  async function checkLocalProvider() {
+    const system = data.system;
+    if (
+      localCheckRequest.current ||
+      !system ||
+      system.demo ||
+      system.generation.provider !== "ollama" ||
+      system.embeddings.provider !== "ollama"
+    )
+      return;
+    const signature = (s: typeof system) =>
+      JSON.stringify([s.demo, s.generation.provider, s.generation.model, s.embeddings.provider, s.embeddings.model, s.embeddings.dimensions]);
+    const started = signature(system);
+    localCheckRequest.current = true;
+    setCheckingLocal(true);
+    setLocalCheckError("");
+    try {
+      const checked = await request<typeof system>("/api/system/check-local", {
+        method: "POST",
+        signal: AbortSignal.timeout(300_000),
+      });
+      if (mounted.current && checked.generation)
+        setSystem((current) => (current && signature(current) === started ? checked : current));
+    } catch (err) {
+      if (mounted.current) {
+        const timedOut = err instanceof Error && err.name === "TimeoutError";
+        setLocalCheckError(
+          timedOut
+            ? "La espera de la prueba ha terminado; el backend puede seguir procesándola. Actualiza el estado antes de volver a verificar."
+            : `${errorMessage(err)} Comprueba el servicio Ollama y los modelos; actualiza el estado antes de repetir la prueba.`,
+        );
+      }
+    } finally {
+      localCheckRequest.current = false;
+      if (mounted.current) setCheckingLocal(false);
+    }
+  }
+
   async function inspectDocument(doc: DocumentItem, offset = 0) {
     setInspectDoc(doc);
     setInspected(null);
     setInspectBusy(true);
     setInspectError("");
     try {
-      setChunkPage(
-        await request<ChunkPage>(
-          `/api/documents/${doc.id}/chunks?offset=${offset}`,
-        ),
-      );
+      setChunkPage(await request<ChunkPage>(`/api/documents/${doc.id}/chunks?offset=${offset}`));
     } catch (err) {
       setInspectError(errorMessage(err));
     } finally {
       setInspectBusy(false);
     }
   }
-  const workspaceName =
-    account.workspaces.find((w) => w.id === account.workspace_id)?.name ??
-    "Workspace";
-  const navItems = [
-    { view: "Workspace", label: "Workspace", icon: LayoutGrid },
-    { view: "Copilot", label: "Copilot", icon: Bot },
-    { view: "Knowledge", label: "Knowledge", icon: FileText },
-    { view: "Approvals", label: "Aprobaciones", icon: ShieldCheck },
-    { view: "Activity", label: "Actividad", icon: History },
-    { view: "Settings", label: "Configuración", icon: Settings2 },
-  ] as const;
-  const pendingCount = actions.filter((a) => a.status === "PENDING").length;
-  const newConversation = () => {
-    setMessages([]);
-    setMenuOpen(false);
-    setConversationId(null);
-    setView("Copilot");
-    setError("");
-  };
-  const prompt = (text: string) => {
-    newConversation();
-    setInput(text);
-  };
-  const sourceOpen = (source: Source) => {
+
+  async function renameConversation(title: string) {
+    const id = chat.conversationId;
+    if (!id) return;
+    try {
+      await request(`/api/conversations/${id}`, jsonBody({ title }, "PATCH"));
+      setConversations((current) => current.map((c) => (c.id === id ? { ...c, title } : c)));
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
+  async function archiveConversation() {
+    const id = chat.conversationId;
+    if (!id) return;
+    try {
+      await request(`/api/conversations/${id}`, jsonBody({ archived: true }, "PATCH"));
+      setConversations((current) => current.filter((c) => c.id !== id));
+      chat.reset();
+      setNotice("Conversación archivada. Su historial y sus decisiones se conservan en Actividad.");
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
+  const onSource = useCallback((source: Source) => {
     setInspected(source);
     setInspectDoc(null);
-  };
+  }, []);
+  // Stable callback for memoized messages; always calls the latest `decide`.
+  const decideRef = useRef(decide);
+  useEffect(() => {
+    decideRef.current = decide;
+  });
+  const onDecide = useCallback(
+    (action: PendingAction, approved: boolean) => void decideRef.current(action, approved),
+    [],
+  );
+
+  const shownError = error || chat.error || data.loadError;
+  const feedback = (
+    <div className="feedbackArea">
+      {voice.audioStatus && (
+        <div className="noticeBanner" role="status">
+          {voice.audioStatus}
+          <button className="textButton" onClick={voice.stopAudio}>
+            Detener audio
+          </button>
+        </div>
+      )}
+      {notice && (
+        <div className="noticeBanner" role="status">
+          {notice}
+        </div>
+      )}
+      {shownError && (
+        <div role="alert" className="errorBanner">
+          <span>{shownError}</span>
+          {chat.retry && (
+            <button
+              className="textButton"
+              onClick={() => {
+                composer.current?.setText(chat.recover());
+                setError("");
+                chat.setError("");
+              }}
+            >
+              Recuperar mensaje para reintentar
+            </button>
+          )}
+        </div>
+      )}
+      {(data.initialLoading || viewBusy) && view !== "Copilot" && (
+        <p className="streamStatus" role="status">
+          <Spinner /> Cargando el workspace…
+        </p>
+      )}
+    </div>
+  );
+
   return (
-    <main className="shell">
+    <main className={`shell view-${view.toLowerCase()} ${menuOpen ? "menuOpen" : ""}`}>
       <a className="skipLink" href="#main-content">
         Saltar al contenido
       </a>
-      <aside
-        className={`sidebar ${menuOpen ? "expanded" : ""}`}
-        aria-label="Navegación del workspace"
-      >
-        <button
-          className="mobileToggle"
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen(!menuOpen)}
-        >
-          <span className="wordmark">
-            MAZMI<span> / OPS</span>
-          </span>
-          {menuOpen ? <PanelLeftClose size={20} /> : <Menu size={20} />}
-        </button>
-        <div className="brand">
-          <div className="brandmark">
-            M<span>·</span>
-          </div>
-          <div>
-            <b>
-              MAZMI<span> SYSTEMS</span>
-            </b>
-            <small>Operations intelligence</small>
-          </div>
-        </div>
-        <div className="workspacePicker">
-          <span className="workspaceMonogram">{workspaceName[0]}</span>
-          <label>
-            <span>ESPACIO DE TRABAJO</span>
-            <select
-              aria-label="Workspace"
-              disabled={loading || !!deciding || !!deleting || !!reindexing}
-              value={account.workspace_id}
-              onChange={(e) =>
-                onWorkspace(e.target.value).catch((err) =>
-                  setError(errorMessage(err)),
-                )
-              }
-            >
-              {account.workspaces.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <nav>
-          {navItems.map(({ view: next, label, icon: Icon }) => (
-            <button
-              key={next}
-              className={`nav ${view === next ? "active" : ""}`}
-              aria-current={view === next ? "page" : undefined}
-              onClick={() => changeView(next)}
-            >
-              <Icon size={18} />
-              <span>{label}</span>
-              {next === "Approvals" && pendingCount > 0 && (
-                <b className="navCount">{pendingCount}</b>
-              )}
-            </button>
-          ))}
-        </nav>
-        <div className="conversationList">
-          <div className="sectionTitle">
-            <span>CONVERSACIONES</span>
-            <button
-              className="iconButton"
-              aria-label="Nueva conversación"
-              disabled={loading || !!deciding}
-              onClick={newConversation}
-            >
-              <Plus size={17} />
-            </button>
-          </div>
-          {conversations.map((c) => (
-            <button
-              className={`conversationLink ${conversationId === c.id ? "active" : ""}`}
-              disabled={loading || !!deciding}
-              key={c.id}
-              onClick={() => openConversation(c.id)}
-            >
-              {c.title}
-            </button>
-          ))}
-          {!conversations.length && (
-            <p className="muted small">
-              Tus consultas quedarán guardadas aquí.
-            </p>
-          )}
-        </div>
-        <div className="sidebarFooter">
-          <p>
-            <ShieldCheck size={15} /> Datos del workspace actual
-          </p>
-          <div>
-            <span className="accountAvatar">
-              {account.email[0].toUpperCase()}
-            </span>
-            <span className="accountEmail">{account.email}</span>
-            <button
-              className="iconButton"
-              aria-label="Cerrar sesión"
-              disabled={loading || !!deciding}
-              onClick={() =>
-                onSignOut().catch((err) => setError(errorMessage(err)))
-              }
-            >
-              <LogOut size={17} />
-            </button>
-          </div>
-        </div>
-      </aside>
-      <section className={`content view-${view.toLowerCase()}`}>
-        {system?.demo && (
+      <div className="backdropScene" aria-hidden="true" />
+      <Sidebar
+        account={account}
+        workspaceName={workspaceName}
+        view={view}
+        open={menuOpen}
+        pendingCount={pendingCount}
+        conversations={data.conversations}
+        conversationId={chat.conversationId}
+        locked={locked}
+        onView={changeView}
+        onWorkspace={(id) => onWorkspace(id).catch((err) => setError(errorMessage(err)))}
+        onConversation={openConversation}
+        onNewConversation={newConversation}
+        onSignOut={() => onSignOut().catch((err) => setError(errorMessage(err)))}
+      />
+      <section className="content">
+        {data.system?.demo && (
           <div className="demoRibbon">
-            <strong>DEMO DE DESARROLLO</strong>
+            <strong>Demo de desarrollo</strong>
             <span>Datos ficticios · IA simulada · Sin conexión con Gemini</span>
           </div>
         )}
-        <header className="topbar">
-          <div className="breadcrumb">
-            {workspaceName}
-            <span>/</span>
-            <h1>{navItems.find((n) => n.view === view)?.label}</h1>
-          </div>
-          <div className="headerActions">
-            {view === "Copilot" ? (
-              <>
-                <div className="segmented" aria-label="Modo de trabajo">
-                  <button
-                    aria-pressed={mode === "ASK"}
-                    disabled={loading}
-                    className={mode === "ASK" ? "selected" : ""}
-                    onClick={() => setMode("ASK")}
-                  >
-                    ASK
-                  </button>
-                  <button
-                    aria-pressed={mode === "DO"}
-                    disabled={loading}
-                    className={mode === "DO" ? "selected do" : ""}
-                    onClick={() => setMode("DO")}
-                  >
-                    DO
-                  </button>
-                </div>
-                <button
-                  className={`voice ${voice ? "on" : ""}`}
-                  aria-pressed={voice}
-                  aria-label="Leer respuestas en voz alta"
-                  onClick={() => {
-                    voiceRef.current = !voice;
-                    setVoice(!voice);
-                    if (voice) stopAudio();
-                  }}
-                >
-                  {voice ? <Volume2 size={17} /> : <VolumeX size={17} />}
-                </button>
-              </>
-            ) : (
-              <button
-                className="quietButton"
-                disabled={loading}
-                onClick={newConversation}
-              >
-                Nueva consulta <ArrowUpRight size={16} />
-              </button>
-            )}
-          </div>
-        </header>
-        <div
-          id="main-content"
-          aria-busy={initialLoading || viewBusy}
-          tabIndex={-1}
-          className="mainScroll"
-          onScroll={(e) => {
-            const el = e.currentTarget;
-            followScroll.current =
-              el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-          }}
-        >
-          <div className="feedbackArea">
-            {audioStatus && (
-              <div className="noticeBanner" role="status">
-                {audioStatus}
-                <button onClick={stopAudio}>Detener audio</button>
-              </div>
-            )}
-            {notice && (
-              <div className="noticeBanner" role="status">
-                {notice}
-              </div>
-            )}
-            {error && (
-              <div role="alert" className="errorBanner">
-                {error}
-                {retry && (
-                  <button
-                    onClick={() => {
-                      setInput(retry);
-                      setRetry("");
-                    }}
-                  >
-                    Recuperar mensaje para reintentar
-                  </button>
-                )}
-              </div>
-            )}
-            {(initialLoading || viewBusy) && (
-              <p className="streamStatus" role="status">
-                <LoaderCircle size={16} /> Cargando el workspace…
-              </p>
-            )}
-          </div>
-          {view === "Workspace" && (
-            <WorkspaceView
-              name={workspaceName}
-              docs={documents}
-              actions={actions}
-              activity={activity}
-              system={system}
-              onView={changeView}
-              onPrompt={prompt}
-            />
-          )}
-          {view === "Knowledge" && (
-            <KnowledgeView
-              docs={documents}
-              system={system}
-              busy={loading || !!deleting || !!reindexing}
-              operation={
-                uploading
-                  ? streamStatus
-                  : reindexing
-                    ? "Reindexando con la colección activa…"
-                    : ""
-              }
-              processing={uploading || !!reindexing}
-              onUpload={() => fileRef.current?.click()}
-              onRemove={removeDocument}
-              onReindex={reindex}
-              onInspect={inspectDocument}
-            />
-          )}
-          {view === "Approvals" && (
-            <ApprovalsView
-              actions={actions}
-              busy={!!deciding || loading}
-              onDecide={decide}
-              onConversation={openConversation}
-            />
-          )}
-          {view === "Activity" && (
-            <ActivityView
-              events={activity}
-              onRefresh={() => changeView("Activity")}
-            />
-          )}
-          {view === "Settings" && (
-            <SettingsView
-              system={system}
-              workspace={workspaceName}
-              onCreate={createWorkspace}
-              creating={creatingWorkspace}
-              onReload={() => changeView("Settings")}
-              checkingLocal={checkingLocal}
-              localCheckError={localCheckError}
-              onCheckLocal={checkLocalProvider}
-            />
-          )}
-          {view === "Copilot" && (
-            <div className="chatCanvas">
-              <ProviderContext system={system} />
-              {!messages.length && (
-                <div className="chatWelcome">
-                  <span className="eyebrow">MAZMI / COPILOT</span>
-                  <h2>
-                    Una pregunta.
-                    <br />
-                    Todo el contexto.
-                  </h2>
-                  <p>
-                    Consulta el conocimiento del workspace o prepara una acción
-                    que tú autorizas.
-                  </p>
-                  <div className="promptList">
-                    {[
-                      "¿Cuántos días de vacaciones hay?",
-                      "¿Qué información hay sobre el acceso?",
-                      "Consulta mis tickets",
-                    ].map((t) => (
-                      <button key={t} onClick={() => setInput(t)}>
-                        {t}
-                        <ArrowUpRight size={16} />
-                      </button>
-                    ))}
-                  </div>
-                  {system?.generation.state === "not_configured" && (
-                    <p className="setupHint">
-                      El proveedor seleccionado todavía no está configurado. Consulta Configuración
-                      o utiliza el modo demo de desarrollo.
-                    </p>
-                  )}
-                </div>
-              )}
-              {messages.map((m, i) => (
-                <article key={i} className={`messageRow ${m.role}`}>
-                  <div className="messageIdentity">
-                    {m.role === "user"
-                      ? "TÚ"
-                      : system?.demo
-                        ? "MAZMI · DEMO"
-                        : "MAZMI"}
-                    {m.role === "assistant" && m.sources?.length ? (
-                      <span>Consulta documental</span>
-                    ) : null}
-                  </div>
-                  <div className="messageBody">
-                    {(m.role === "assistant" &&
-                      m.content.startsWith(
-                        "No encuentro información suficiente",
-                      )) ||
-                    m.content.startsWith(
-                      "Los documentos recuperados contienen información contradictoria",
-                    ) ? (
-                      <Insufficient text={m.content} />
-                    ) : (
-                      <AnswerText
-                        text={m.content}
-                        sources={m.sources ?? []}
-                        onSource={sourceOpen}
-                      />
-                    )}{" "}
-                    {m.failed && (
-                      <small className="errorText">
-                        Respuesta incompleta · no se ha confirmado ninguna
-                        ejecución desde este mensaje.
-                      </small>
-                    )}
-                    {m.sources && m.sources.length > 0 && (
-                      <div className="sources">
-                        <span className="eyebrow">
-                          EVIDENCIA RECUPERADA · {m.sources.length}{" "}
-                          {m.sources.length === 1 ? "FRAGMENTO" : "FRAGMENTOS"}
-                        </span>
-                        <div className="sourceGrid">
-                          {m.sources.map((source, j) => (
-                            <SourceChip
-                              key={source.chunk_id}
-                              source={source}
-                              index={j + 1}
-                              selected={m.content.includes(`[${j + 1}]`)}
-                              onOpen={() => sourceOpen(source)}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {m.pending && (
-                      <ActionCard
-                        action={m.pending}
-                        busy={!!deciding || loading}
-                        onDecide={decide}
-                      />
-                    )}
-                  </div>
-                </article>
-              ))}
-              {loading && (
-                <div className="streamStatus" role="status">
-                  <LoaderCircle size={16} /> {streamStatus || "Procesando…"}
-                </div>
-              )}
-              <div ref={endRef} />
-            </div>
-          )}
-        </div>
-        {view === "Copilot" && (
-          <div className="composerArea">
-            <div className={`modeHint ${mode.toLowerCase()}`}>
-              <b>{mode}</b>
-              {mode === "ASK"
-                ? "Consulta conocimiento y herramientas de lectura."
-                : "Prepara acciones. Ninguna se ejecuta sin tu aprobación."}
-            </div>
-            <form className="composer" onSubmit={submit}>
-              <textarea
-                aria-label="Mensaje al copiloto"
-                maxLength={8000}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={
-                  mode === "ASK"
-                    ? "Pregunta con contexto…"
-                    : "Describe la acción que necesitas…"
-                }
-                onKeyDown={(e) => {
-                  if (
-                    e.key === "Enter" &&
-                    !e.shiftKey &&
-                    !e.nativeEvent.isComposing
-                  ) {
-                    e.preventDefault();
-                    submit();
-                  }
+        <Topbar
+          workspaceName={workspaceName}
+          title={NAV_ITEMS.find((n) => n.view === view)?.label ?? view}
+          menuOpen={menuOpen}
+          onMenu={() => setMenuOpen((open) => !open)}
+          isCopilot={view === "Copilot"}
+          conversationTitle={conversationTitle}
+          locked={locked}
+          speechEnabled={voice.speechEnabled}
+          onSpeech={voice.toggleSpeech}
+          onNewConversation={newConversation}
+          onRename={renameConversation}
+          onArchive={archiveConversation}
+        />
+        {view === "Copilot" ? (
+          <ChatView
+            ref={composer}
+            system={data.system}
+            messages={chat.messages}
+            draft={chat.draft}
+            loadingHistory={chat.busy === "loading"}
+            deciding={!!deciding || chat.busy !== "idle"}
+            mode={mode}
+            onMode={setMode}
+            listening={voice.listening}
+            onSend={send}
+            onStop={chat.stop}
+            onListen={() => void voice.listen((text) => composer.current?.setText(text))}
+            onSource={onSource}
+            onDecide={onDecide}
+            feedback={feedback}
+            context={<ProviderContext system={data.system} />}
+          />
+        ) : (
+          <div
+            id="main-content"
+            tabIndex={-1}
+            className="mainScroll"
+            aria-busy={data.initialLoading || viewBusy}
+          >
+            {feedback}
+            {view === "Workspace" && (
+              <WorkspaceView
+                name={workspaceName}
+                docs={data.documents}
+                actions={data.actions}
+                activity={data.activity}
+                conversations={data.conversations}
+                system={data.system}
+                onView={changeView}
+                onPrompt={(text) => {
+                  newConversation();
+                  requestAnimationFrame(() => composer.current?.setText(text));
                 }}
+                onUpload={() => fileRef.current?.click()}
+                onConversation={openConversation}
               />
-              <div className="composerTools">
-                <div>
-                  <button
-                    type="button"
-                    className={`iconButton mic ${listening ? "recording" : ""}`}
-                    disabled={loading}
-                    aria-pressed={listening}
-                    aria-label={
-                      listening ? "Detener micrófono" : "Activar micrófono"
-                    }
-                    onClick={listen}
-                  >
-                    {listening ? <Square size={17} /> : <Mic size={18} />}
-                  </button>
-                  <span>
-                    {listening
-                      ? "Grabando… máximo 60 s"
-                      : "Enter para enviar · Shift + Enter para nueva línea"}
-                  </span>
-                </div>
-                {streaming ? (
-                  <button
-                    type="button"
-                    className="quietButton"
-                    onClick={() => chatRequest.current?.abort()}
-                  >
-                    Detener consulta
-                  </button>
-                ) : (
-                  <button
-                    aria-label="Enviar mensaje"
-                    className="send"
-                    disabled={!input.trim() || loading || !!deciding}
-                  >
-                    <Send size={17} />
-                  </button>
-                )}
-              </div>
-            </form>
-            <p>
-              Las citas permiten verificar pasajes. Una coincidencia no
-              garantiza suficiencia semántica.
-            </p>
+            )}
+            {view === "Knowledge" && (
+              <KnowledgeView
+                docs={data.documents}
+                system={data.system}
+                busy={uploading || !!deleting || !!reindexing || chat.busy !== "idle"}
+                operation={
+                  uploading
+                    ? "Subiendo e indexando el documento…"
+                    : reindexing
+                      ? "Reindexando con la colección activa…"
+                      : ""
+                }
+                processing={uploading || !!reindexing}
+                onUpload={() => fileRef.current?.click()}
+                onRemove={removeDocument}
+                onReindex={reindex}
+                onInspect={inspectDocument}
+              />
+            )}
+            {view === "Approvals" && (
+              <ApprovalsView
+                actions={data.actions}
+                busy={!!deciding || chat.busy !== "idle"}
+                onDecide={decide}
+                onConversation={openConversation}
+              />
+            )}
+            {view === "Activity" && (
+              <ActivityView events={data.activity} onRefresh={() => changeView("Activity")} />
+            )}
+            {view === "Settings" && (
+              <SettingsView
+                system={data.system}
+                workspace={workspaceName}
+                onCreate={createWorkspace}
+                creating={creatingWorkspace}
+                onReload={() => changeView("Settings")}
+                checkingLocal={checkingLocal}
+                localCheckError={localCheckError}
+                onCheckLocal={checkLocalProvider}
+              />
+            )}
           </div>
         )}
       </section>
@@ -1191,35 +550,35 @@ export function Copilot({
         onChange={(e) => {
           const file = e.target.files?.[0];
           e.target.value = "";
-          if (file) upload(file);
+          if (file) void upload(file);
         }}
       />
       {inspected && (
         <Inspector
           title={inspected.filename}
-          subtitle={
-            inspected.page
-              ? `Página ${inspected.page} · Fragmento #${inspected.chunk_id}`
-              : `Sin páginas fiables · Fragmento #${inspected.chunk_id}`
-          }
+          subtitle={[
+            inspected.section,
+            inspected.page ? `Página ${inspected.page}` : "Sin páginas fiables",
+            `Fragmento #${inspected.chunk_id}`,
+          ]
+            .filter(Boolean)
+            .join(", ")}
           onClose={() => setInspected(null)}
         >
-          <div className="inspectorLabel">TEXTO RECUPERADO</div>
+          <h3 className="inspectorLabel">Pasaje almacenado completo</h3>
           <blockquote>{inspected.excerpt}</blockquote>
           <p className="footnote">
-            Similitud: {inspected.score.toFixed(3)}. Es una medida de cercanía,
-            no de certeza ni de aplicabilidad.
+            Similitud {inspected.score.toFixed(3)}: mide cercanía, no certeza ni aplicabilidad. La
+            respuesta cita frases literales de este pasaje.
           </p>
           {inspected.document_id && (
             <button
+              className="ghost"
               onClick={() =>
-                inspectDocument({
-                  id: inspected.document_id!,
-                  filename: inspected.filename,
-                } as DocumentItem)
+                inspectDocument({ id: inspected.document_id!, filename: inspected.filename } as DocumentItem)
               }
             >
-              Ver fragmentos del documento <ArrowRightIcon />
+              Ver todos los fragmentos del documento
             </button>
           )}
         </Inspector>
@@ -1227,56 +586,53 @@ export function Copilot({
       {inspectDoc && (
         <Inspector
           title={inspectDoc.filename}
-          subtitle="Texto conservado · solo workspace actual"
+          subtitle="Texto conservado, solo del workspace actual"
           onClose={() => {
             setInspectDoc(null);
             setChunkPage(null);
           }}
         >
           {inspectBusy ? (
-            <p role="status">Cargando fragmentos…</p>
+            <p role="status">
+              <Spinner /> Cargando fragmentos…
+            </p>
           ) : inspectError ? (
             <p role="alert">{inspectError}</p>
           ) : (
             <>
               {chunkPage?.chunks.map((c) => (
                 <section className="chunkBlock" key={c.id}>
-                  <span className="inspectorLabel">
-                    FRAGMENTO {c.index + 1} ·{" "}
-                    {c.page ? `PÁGINA ${c.page}` : "SIN PAGINACIÓN"}
-                  </span>
+                  <h3 className="inspectorLabel">
+                    Fragmento {c.index + 1}
+                    {c.section ? `, ${c.section}` : ""}
+                    {c.page ? `, página ${c.page}` : ""}
+                  </h3>
                   <blockquote>{c.content}</blockquote>
                 </section>
               ))}
               {chunkPage?.total === 0 && (
                 <EmptyState title="Sin fragmentos conservados">
-                  Este documento no contiene texto indexado. Revisa el error de
-                  indexación y vuelve a subir un archivo válido.
+                  Este documento no contiene texto indexado. Revisa el error de indexación y vuelve
+                  a subir un archivo válido.
                 </EmptyState>
               )}
               {chunkPage && chunkPage.total > 0 && (
                 <div className="pagination">
                   <button
+                    className="ghost small"
                     disabled={chunkPage.offset === 0}
-                    onClick={() =>
-                      inspectDocument(
-                        inspectDoc,
-                        Math.max(0, chunkPage.offset - 25),
-                      )
-                    }
+                    onClick={() => inspectDocument(inspectDoc, Math.max(0, chunkPage.offset - 25))}
                   >
                     Anterior
                   </button>
                   <span>
-                    {chunkPage.offset + 1}–
-                    {Math.min(chunkPage.offset + 25, chunkPage.total)} de{" "}
+                    {chunkPage.offset + 1}–{Math.min(chunkPage.offset + 25, chunkPage.total)} de{" "}
                     {chunkPage.total}
                   </span>
                   <button
+                    className="ghost small"
                     disabled={chunkPage.offset + 25 >= chunkPage.total}
-                    onClick={() =>
-                      inspectDocument(inspectDoc, chunkPage.offset + 25)
-                    }
+                    onClick={() => inspectDocument(inspectDoc, chunkPage.offset + 25)}
                   >
                     Siguiente
                   </button>
@@ -1288,7 +644,4 @@ export function Copilot({
       )}
     </main>
   );
-}
-function ArrowRightIcon() {
-  return <ArrowUpRight size={16} />;
 }

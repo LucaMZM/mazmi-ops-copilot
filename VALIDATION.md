@@ -1,3 +1,70 @@
+# MAZMI Ops Copilot 2.0 — 9 November 2026
+
+Branch `feat/ops-copilot-v2` (local commits, not pushed). This section supersedes the counts below; earlier sections are kept unchanged as history. **No `v1.0.0` tag**: the documented local-model acceptance criteria are still not met (see "Real local model").
+
+## Evidence categories
+
+| Category | What it proves | What it does not |
+|---|---|---|
+| Provider doubles + real PostgreSQL 17.11/pgvector (pytest) | Authorization, transactions, locks, idempotency, SSE contract, RAG plumbing | Model quality |
+| Synthetic vectors (hashed bag-of-words) | SQL/lexical behaviour of retrieval changes | Semantic retrieval quality |
+| Real EmbeddingGemma 768d on a synthetic corpus | Retrieval quality of the v2 changes on fictitious documents | Large or real corpora |
+| Real Qwen3 4B, full HTTP pipeline | Answer/abstention behaviour and latency on 8 fixed cases | General accuracy |
+| Real browser (production build, deterministic demo) | UI journeys, layout, responsive behaviour | Model quality |
+
+## Defects reproduced and fixed
+
+| Defect | Reproduction | Fix | Regression |
+|---|---|---|---|
+| `/api/chat/stream` required a generation provider even for exact ticket reads (0 model calls); invalid limits and foreign conversations returned an SSE error inside HTTP 200 | `tests/test_chat_gate.py`: 3/6 failed on the previous code | Shared `preflight_chat()`; validation before streaming keeps 400/404/503 | 6 HTTP tests |
+| Chat held `FOR UPDATE` on the conversation and an open transaction during embedding and inference | Independent session `FOR UPDATE NOWAIT` blocked; `idle in transaction` = 1 during the model call | Phased `run_chat`: short reads, provider work without a connection, one atomic write | `test_transactions.py` (failed before) |
+| A document deleted during inference could still be cited in the saved answer | Delete during the assessor call → HTTP 200 and persisted citation | Final transaction re-checks cited chunks (exists, ready, same workspace/collection) → 409, nothing saved | failed before |
+| Reindex locked the document while computing embeddings | `NOWAIT` lock failed during the provider call | Read → embed without connection → re-validate fingerprint and write | failed before |
+| Duplicate/retried chat requests created duplicate proposals | Documented limitation in the 27 Oct report | `client_request_id` + `chat_requests` (migration 005) + advisory lock; replays never revive decided actions | sequential and concurrent tests |
+| SSE: unexpected worker exceptions ended the stream without a terminal event; queue polling every 50 ms; no deadline | Code review + unit tests | asyncio bridge, heartbeat, deadline (504 event), sanitized generic error | `test_streaming.py` (disconnect, timeout) |
+| Frontend: no `@/` alias in Vitest, layout grids overflowing with long titles, list syntax inside quotes, low contrast of cited numbers in dark theme | Real browser inspection (DOM measurements) | Fixed; see commits | tests + DOM check `scrollWidth == clientWidth` |
+| iCloud renamed two new files (`sidebar 2.tsx`) during the session | `tsc` module-not-found | Restored names; validation environments kept outside synchronized folders | — |
+
+## Automated checks (final run)
+
+- Backend: **306 passed**, 0 skipped (real PostgreSQL 17.11 with pgvector, isolated schemas), Ruff clean. Includes 33 new tests: provider gate, SSE, transactions/locks, idempotency (sequential and concurrent), migration 005 data preservation, chunking, lexical modes, diversity, focused quotes, reasoning option.
+- Migration runner applied twice on an empty database: ledger 001–005, idempotent.
+- Frontend: **47 passed** (11 new: SSE parser, idempotent retry, 409 handling, inspector, conversations), `tsc --noEmit`, ESLint and `next build` clean. Three existing tests were adjusted to deliberate UX changes, each commented in the test.
+
+## RAG measurements
+
+Retrieval ablation, 22 answerable questions on an 8-document synthetic Spanish corpus ([corpus](backend/evals/v2_retrieval_corpus.json)); same query vectors for every configuration:
+
+| Configuration | Real EmbeddingGemma R@3 / R@6 / full@6 / MRR | Synthetic vectors R@6 / MRR |
+|---|---|---|
+| v1: flat chunks, all-terms FTS, no cap | 0.955 / 0.977 / 0.955 / 0.977 | 0.750 / 0.570 |
+| structured chunks only | 1.000 / 1.000 / 1.000 / **1.000** | 0.773 / 0.686 |
+| any-terms FTS only | 1.000 / 1.000 / 1.000 / 0.955 | 0.955 / 0.818 |
+| **v2 default** (structured + any-terms + 3/doc) | **1.000 / 1.000 / 1.000** / 0.977 | **0.955 / 0.896** |
+
+Structured chunks average 276 characters versus 811, so the six passages sent to the assessor are about a third of the previous text. With real embeddings v1 was already strong on this small corpus; v2 fixes the remaining multi-document miss. Trade-off kept visible: structured + all-terms has the best MRR (1.0); any-terms is kept because it protects recall when vectors are weak (×1.27 R@6 on synthetic vectors). Reports: [real](backend/evals/v2-retrieval-embeddinggemma.json), [synthetic](backend/evals/v2-retrieval-synthetic.json). Query embedding p50 867 ms / p95 884 ms; retrieval SQL p50 0.67 ms.
+
+## Real local model (Qwen3 4B, EmbeddingGemma, Ollama 0.40.7, M2 8 GB)
+
+Same 8-case corpus as previous reports, full HTTP pipeline, fresh `_eval` databases, one variable changed:
+
+| Mode | Positives | Negatives | Unsupported | Timeout / incomplete | Journeys | Wall time |
+|---|---:|---:|---:|---:|---|---:|
+| `model_default` (default, unchanged) | 2/4 | 4/4 | 0 | 1 / 1 | 13/13 | 777 s |
+| `no_think_directive` (opt-in) | 4/4 | 2/4 | **2** | 0 / 0 | 13/13 | 176 s |
+
+All 13 security journeys passed in both runs, including the ASK read-tool journey that failed on 22 October. Retrieval document recall@6 and MRR were 1.0 in completed cases. The faster mode was **rejected as default** because it accepted insufficient evidence twice. Both reports keep every attempted case ([default](backend/evals/v2-local-model-default.json), [no_think](backend/evals/v2-local-no-think.json)). `automated_fixture_checks_passed=false` in both: acceptance is not met.
+
+## Browser verification (real, not mocked)
+
+Production Next build on 127.0.0.1:3000, FastAPI on 127.0.0.1:8010, dedicated `mazmi_v2_demo` database seeded by `python -m app.demo` (deterministic, labelled). Verified in the in-app browser and Playwright: login, Workspace with real counts, multi-document answer with two citations and sections, source inspector with the stored passage, abstention on the salary question, DO proposal → confirmation → Ticket #1 and approval counter update, Knowledge, Approvals, Activity, Settings, dark theme, phone 375×812 and 390×844 without horizontal overflow (`scrollWidth == clientWidth`). Load metrics on that machine: first contentful paint 68 ms, 154 KB compressed JS in 6 files, 10 KB CSS, initial API calls 14–29 ms. No FPS or render-count claims are made. Voice was not tested (no local models configured).
+
+## Not verified / remaining
+
+Gemini and OpenAI live calls, real voice, Docker Compose runtime, large-corpus retrieval, HNSW/ANN, durable indexing queue, multi-user RBAC. Accessibility was checked through structure, focus handling and contrast fixes, not with an automated auditor.
+
+---
+
 # Stabilization closure — 27 October 2026
 
 This checkpoint supersedes historical counts below. **Safe fixes are published; local RAG still blocks v1.0.0.** No production-readiness claim.
