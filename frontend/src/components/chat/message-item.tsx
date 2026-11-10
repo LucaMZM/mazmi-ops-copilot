@@ -7,7 +7,6 @@ import { isAbstention } from "@/lib/format";
 
 type Props = {
   message: Message;
-  demo: boolean;
   deciding: boolean;
   onSource: (source: Source) => void;
   onDecide: (action: PendingAction, approved: boolean) => void;
@@ -16,7 +15,6 @@ type Props = {
 /** One committed message. Memoized: streaming and typing never re-render history. */
 export const MessageItem = memo(function MessageItem({
   message: m,
-  demo,
   deciding,
   onSource,
   onDecide,
@@ -28,7 +26,7 @@ export const MessageItem = memo(function MessageItem({
   return (
     <article className={`messageRow ${m.role} ${m.failed ? "failed" : ""}`}>
       <div className="messageIdentity">
-        {m.role === "user" ? "Tú" : demo ? "MAZMI demo" : "MAZMI"}
+        {m.role === "user" ? "Tú" : "MAZMI"}
         {m.role === "assistant" && m.sources?.length ? (
           <span className="identityHint">Respuesta documental</span>
         ) : null}
@@ -73,10 +71,10 @@ export const MessageItem = memo(function MessageItem({
 });
 
 /** The in-flight answer: progress from real server stages, then streamed text. */
-export function DraftMessage({ draft, demo }: { draft: Draft; demo: boolean }) {
+export function DraftMessage({ draft }: { draft: Draft }) {
   return (
     <article className="messageRow assistant draft" aria-busy="true">
-      <div className="messageIdentity">{demo ? "MAZMI demo" : "MAZMI"}</div>
+      <div className="messageIdentity">MAZMI</div>
       <div className="messageBody">
         {draft.text ? <div className="answerText streamingText">{draft.text}</div> : null}
         <div className="streamStatus" role="status">
