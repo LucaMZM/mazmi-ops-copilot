@@ -285,13 +285,12 @@ export function Copilot({
     if (
       localCheckRequest.current ||
       !system ||
-      system.demo ||
       system.generation.provider !== "ollama" ||
       system.embeddings.provider !== "ollama"
     )
       return;
     const signature = (s: typeof system) =>
-      JSON.stringify([s.demo, s.generation.provider, s.generation.model, s.embeddings.provider, s.embeddings.model, s.embeddings.dimensions]);
+      JSON.stringify([s.generation.provider, s.generation.model, s.embeddings.provider, s.embeddings.model, s.embeddings.dimensions]);
     const started = signature(system);
     localCheckRequest.current = true;
     setCheckingLocal(true);
@@ -433,12 +432,6 @@ export function Copilot({
         onSignOut={() => onSignOut().catch((err) => setError(errorMessage(err)))}
       />
       <section className="content">
-        {data.system?.demo && (
-          <div className="demoRibbon">
-            <strong>Demo de desarrollo</strong>
-            <span>Datos ficticios · IA simulada · Sin conexión con Gemini</span>
-          </div>
-        )}
         <Topbar
           workspaceName={workspaceName}
           title={NAV_ITEMS.find((n) => n.view === view)?.label ?? view}

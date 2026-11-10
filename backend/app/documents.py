@@ -23,7 +23,7 @@ from .audit import audit
 from .auth import CurrentUser, Principal
 from .config import settings
 from .db import get_conn
-from .errors import provider_error, require_provider
+from .errors import provider_error
 from .providers import ProviderUnavailable
 from .rag import chunk_pages, embed_texts, embedding_collection, extract_pages
 
@@ -119,7 +119,6 @@ def index_document(filename: str, content_type: str | None, raw: bytes, user: Pr
         content_type and content_type not in SUPPORTED[ext] | {"application/octet-stream"}
     ):
         raise HTTPException(400, "Extensión o MIME no admitido. Usa PDF, DOCX, TXT o MD.")
-    require_provider("embedding")
     try:
         collection = embedding_collection()
     except Exception as exc:
@@ -258,7 +257,6 @@ def _fingerprint(rows) -> str:
 
 @router.post("/{document_id}/reindex")
 def reindex_document(document_id: UUID, user: CurrentUser):
-    require_provider("embedding")
     try:
         collection = embedding_collection()
         # 1. Short read: no lock is held while embeddings are computed.

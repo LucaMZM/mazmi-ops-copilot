@@ -207,11 +207,14 @@ def test_committed_receipt_needs_no_provider_and_uses_db_values(monkeypatch):
     assert "Saved *title*" in text and "Uncommitted" not in text
 
 
-@pytest.mark.parametrize("message,limit", [
-    ("Lista los últimos 3 tickets", 3),
-    ("Lista los tickets del workspace", 5),
-    ("Consulta mis tickets", 5),
-])
+@pytest.mark.parametrize(
+    "message,limit",
+    [
+        ("Lista los últimos 3 tickets", 3),
+        ("Lista los tickets del workspace", 5),
+        ("Consulta mis tickets", 5),
+    ],
+)
 @pytest.mark.parametrize("mode", ["ASK", "DO"])
 def test_exact_read_needs_no_model(monkeypatch, message, limit, mode):
     monkeypatch.setattr(agent, "client", None)

@@ -10,20 +10,9 @@ from app.providers import Ollama
 
 @pytest.fixture
 def local(monkeypatch):
-    monkeypatch.setattr(settings, "demo_mode", False)
     monkeypatch.setattr(settings, "generation_provider", "ollama")
     monkeypatch.setattr(settings, "embedding_provider", "ollama")
     monkeypatch.setattr(settings, "embedding_dimensions", 768)
-
-
-def test_smoke_refuses_demo_and_nonlocal_provider(monkeypatch):
-    monkeypatch.setattr(settings, "demo_mode", True)
-    with pytest.raises(RuntimeError, match="DEMO_MODE"):
-        check_local.run_checks()
-    monkeypatch.setattr(settings, "demo_mode", False)
-    monkeypatch.setattr(settings, "generation_provider", "gemini")
-    with pytest.raises(RuntimeError, match="only permits Ollama"):
-        check_local.run_checks()
 
 
 def fixture_server(request):

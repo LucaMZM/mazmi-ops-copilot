@@ -12,7 +12,6 @@ from app.config import settings
 
 @pytest.fixture
 def local(monkeypatch):
-    monkeypatch.setattr(settings, "demo_mode", False)
     monkeypatch.setattr(settings, "generation_provider", "ollama")
     monkeypatch.setattr(settings, "embedding_provider", "ollama")
     monkeypatch.setattr(settings, "embedding_dimensions", 768)
@@ -40,7 +39,7 @@ def test_readiness_requires_authentication_and_origin(api, monkeypatch):
 def test_configured_is_not_verified_and_get_does_not_infer(api, local, monkeypatch):
     monkeypatch.setattr(check_local, "run_checks", lambda **kw: pytest.fail("GET must not infer"))
     data = api.get("/api/system").json()
-    assert data["generation"]["state"] == "configured"
+    assert data["generation"]["provider"] == "ollama"
     assert data["generation"]["verification"] == "not_checked"
     assert data["embeddings"]["collection"] is None
 
@@ -104,11 +103,3 @@ def test_concurrent_probe_is_rejected_and_failed_exception_releases_lock(api, lo
     assert response.status_code == 502 and "PRIVATE" not in response.text
     monkeypatch.setattr(check_local, "run_checks", lambda **kw: passed())
     assert api.post("/api/system/check-local").json()["generation"]["verification"] == "passed"
-
-
-@pytest.mark.parametrize("demo,cloud", [(True, False), (False, True)])
-def test_probe_rejects_demo_or_cloud_without_calling_model(api, monkeypatch, demo, cloud):
-    monkeypatch.setattr(settings, "demo_mode", demo)
-    monkeypatch.setattr(settings, "generation_provider", "gemini" if cloud else "ollama")
-    monkeypatch.setattr(check_local, "run_checks", lambda **kw: pytest.fail("must not infer"))
-    assert api.post("/api/system/check-local").status_code == 400

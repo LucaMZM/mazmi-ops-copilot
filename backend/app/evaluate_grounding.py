@@ -83,7 +83,8 @@ def evaluate(*, client=None, case_names=None, include_answers=True, dataset_path
             continue
         abstained = bool(meta["abstention_reason"])
         assessment_failed = client is not None and meta["abstention_reason"] in {
-            "incomplete_evidence_assessment", "invalid_evidence_assessment",
+            "incomplete_evidence_assessment",
+            "invalid_evidence_assessment",
             "invalid_evidence_selection",
         }
         refs = [int(n) for n in re.findall(r"\[(\d+)\]", case["baseline_answer"])]
@@ -115,7 +116,11 @@ def evaluate(*, client=None, case_names=None, include_answers=True, dataset_path
     negatives = [r for r in results if r["expected_abstention"]]
     positives = [r for r in results if not r["expected_abstention"]]
     answered = [r for r in completed if not r["abstained"]]
-    paired = [r for r in completed if r["name"] in historical] if client is None and dataset_path is None else []
+    paired = (
+        [r for r in completed if r["name"] in historical]
+        if client is None and dataset_path is None
+        else []
+    )
     paired_negatives = [r for r in paired if r["expected_abstention"]]
     return {
         "mode": "live-ollama-fixed-passages" if client is not None else "offline-assessor-doubles",
@@ -171,20 +176,26 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true", help="Explicit Ollama-only model calls")
     parser.add_argument("--case", action="append", dest="case_names", help="Run only named cases")
-    parser.add_argument("--dataset", type=Path, help="Explicit local fixed-passage evaluation dataset")
+    parser.add_argument(
+        "--dataset", type=Path, help="Explicit local fixed-passage evaluation dataset"
+    )
     args = parser.parse_args()
     client = None
     if args.live:
         from .config import settings
         from .providers import generation_client
 
-        if settings.demo_mode or settings.generation_provider != "ollama":
-            parser.error("--live requires DEMO_MODE=false and GENERATION_PROVIDER=ollama")
+        if settings.generation_provider != "ollama":
+            parser.error("--live requires GENERATION_PROVIDER=ollama")
         client = generation_client()
     print(
         json.dumps(
-            evaluate(client=client, case_names=args.case_names, include_answers=not args.live,
-                     dataset_path=args.dataset),
+            evaluate(
+                client=client,
+                case_names=args.case_names,
+                include_answers=not args.live,
+                dataset_path=args.dataset,
+            ),
             ensure_ascii=False,
             indent=2,
         )

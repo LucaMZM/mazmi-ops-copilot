@@ -79,7 +79,11 @@ def render_tickets(result: object, limit: int, disclose_scope: bool = False) -> 
     tickets = [TicketResult.model_validate(row) for row in result]
     if len({ticket.id for ticket in tickets}) != len(tickets):
         raise RuntimeError("Resultado de tickets duplicado")
-    scope = "Consulta de últimos tickets del workspace, sin filtros adicionales.\n" if disclose_scope else ""
+    scope = (
+        "Consulta de últimos tickets del workspace, sin filtros adicionales.\n"
+        if disclose_scope
+        else ""
+    )
     if not tickets:
         return scope + "No hay tickets en este workspace."
     lines = [scope + f"Tickets del workspace (últimos {len(tickets)}):"]
@@ -191,17 +195,27 @@ def answer(
         duration_ms = int((time.perf_counter() - started) * 1000)
         if emit:
             emit({"type": "delta", "text": text})
-        return text, None, {
-            "duration_ms": duration_ms,
-            "model": None,
-            "model_calls": 0,
-            "input_tokens": 0,
-            "output_tokens": 0,
-            "tools": [{"name": "get_tickets", "arguments": direct_query.model_dump(),
-                       "result_count": len(result), "duration_ms": duration_ms}],
-            "citations": [],
-            "abstention_reason": None,
-        }
+        return (
+            text,
+            None,
+            {
+                "duration_ms": duration_ms,
+                "model": None,
+                "model_calls": 0,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "tools": [
+                    {
+                        "name": "get_tickets",
+                        "arguments": direct_query.model_dump(),
+                        "result_count": len(result),
+                        "duration_ms": duration_ms,
+                    }
+                ],
+                "citations": [],
+                "abstention_reason": None,
+            },
+        )
     if not client:
         raise RuntimeError("Proveedor no disponible")
     inputs = [{"role": "user", "content": f"MODO: {mode}\nPETICIÓN:\n{message}"}]

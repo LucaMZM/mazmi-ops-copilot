@@ -8,47 +8,33 @@ import { useTheme, type ThemePreference } from "@/hooks/use-theme";
 export function ProviderContext({ system }: { system: SystemInfo | null }) {
   if (!system) return null;
   const provider = system.generation;
-  const label = system.demo
-    ? "DEMO · IA simulada"
-    : provider.provider === "ollama"
-      ? provider.verification === "passed"
-        ? "Ollama · última prueba local completada"
-        : provider.verification === "failed"
-          ? "Ollama · última prueba local fallida"
-          : "Ollama · seleccionado, sin verificar"
-      : `${provider.provider === "gemini" ? "Gemini" : "OpenAI"} · ${
-          provider.state === "not_configured" ? "sin API key configurada" : "configurado, sin verificar"
-        }`;
-  const tone = system.demo
-    ? "demo"
-    : provider.verification === "passed"
-      ? "ok"
-      : provider.verification === "failed" || provider.state === "not_configured"
-        ? "warn"
-        : "neutral";
+  const label =
+    provider.verification === "passed"
+      ? "Ollama local · última prueba completada"
+      : provider.verification === "failed"
+        ? "Ollama local · última prueba fallida"
+        : "Ollama local · sin verificar";
+  const tone =
+    provider.verification === "passed" ? "ok" : provider.verification === "failed" ? "warn" : "neutral";
   return (
-    <div className={`providerContext ${tone}`} aria-label="Proveedor de la consulta">
+    <div className={`providerContext ${tone}`} aria-label="Modelo local de la consulta">
       <span className="providerDot" aria-hidden="true" />
       <span>{label}</span>
       <code translate="no">{provider.model}</code>
-      {!system.demo && provider.checked_at && (
-        <time dateTime={provider.checked_at}>{date(provider.checked_at)}</time>
-      )}
+      {provider.checked_at && <time dateTime={provider.checked_at}>{date(provider.checked_at)}</time>}
     </div>
   );
 }
 
 function verificationText(provider: ProviderInfo) {
-  return provider.verification === "simulated"
-    ? "Probado con fixtures; sin conexión real"
-    : provider.verification === "passed"
-      ? "Última prueba local completada"
-      : provider.verification === "failed"
-        ? "Última prueba local fallida"
-        : "No verificada";
+  return provider.verification === "passed"
+    ? "Última prueba local completada"
+    : provider.verification === "failed"
+      ? "Última prueba local fallida"
+      : "No verificada";
 }
 
-function ProviderSection({ title, help, provider }: { title: string; help: string; provider: ProviderInfo }) {
+function ModelSection({ title, help, provider }: { title: string; help: string; provider: ProviderInfo }) {
   return (
     <section className="settingSection surface">
       <div>
@@ -57,8 +43,8 @@ function ProviderSection({ title, help, provider }: { title: string; help: strin
       </div>
       <dl>
         <div>
-          <dt>Proveedor</dt>
-          <dd>{provider.provider}</dd>
+          <dt>Motor</dt>
+          <dd>Ollama (local)</dd>
         </div>
         <div>
           <dt>Modelo</dt>
@@ -67,21 +53,11 @@ function ProviderSection({ title, help, provider }: { title: string; help: strin
           </dd>
         </div>
         <div>
-          <dt>Configuración</dt>
+          <dt>Estado</dt>
           <dd>
-            <Badge state={provider.state === "not_configured" ? "failed" : "neutral"}>
-              {provider.state === "demo"
-                ? "Simulación de desarrollo"
-                : provider.state === "configured"
-                  ? "Configurado"
-                  : "No configurado"}
+            <Badge state={provider.verification === "failed" ? "failed" : "neutral"}>
+              {verificationText(provider)}
             </Badge>
-          </dd>
-        </div>
-        <div>
-          <dt>Conexión real</dt>
-          <dd>
-            {verificationText(provider)}
             {provider.checked_at && (
               <>
                 <br />
@@ -130,7 +106,7 @@ export function SettingsView({
           <h2>Configuración efectiva del servidor</h2>
           <p>
             Valores de solo lectura. Para cambiarlos, edita el archivo .env local y reinicia el
-            backend. Las claves nunca llegan al navegador.
+            backend. Todo el procesamiento se realiza en tu equipo con Ollama.
           </p>
         </div>
         <button className="ghost" onClick={onReload}>
@@ -144,24 +120,57 @@ export function SettingsView({
       ) : (
         <>
           <p className="settingsNotice surface">
-            {system.demo
-              ? "Modo demo: respuestas y vectores deterministas simulados. Ninguna conexión con Gemini."
-              : "Configurado no significa conectado. Actualizar estado solo lee la configuración; la prueba local se ejecuta cuando la solicitas."}
+            Configurado no significa conectado. Actualizar estado solo lee la configuración; la
+            prueba local se ejecuta cuando la solicitas.
           </p>
-          <ProviderSection
+          <ModelSection
             title="Generación"
-            help="Evalúa la suficiencia de la evidencia y propone acciones. Nunca redacta hechos sin pasaje."
+            help="Selecciona citas literales, comprueba que responden a la pregunta y propone acciones. Nunca redacta hechos sin pasaje."
             provider={system.generation}
           />
-          <ProviderSection
+          <ModelSection
             title="Embeddings"
             help="Cambiar de modelo o dimensión exige reindexar los documentos."
             provider={system.embeddings}
           />
-          {!system.demo &&
-            system.generation.provider === "ollama" &&
-            system.embeddings.provider === "ollama" && (
-              <section className="settingSection surface">
+          <section className="settingSection surface">
+            <div>
+              <h3>Motor local</h3>
+              <p>
+                {system.runtime.reasoning === "off"
+                  ? "Razonamiento desactivado: Qwen3 gasta su presupuesto de salida en responder, no en pensar."
+                  : "Razonamiento activado: las respuestas son más lentas y pueden agotar el tiempo."}
+              </p>
+            </div>
+            <dl>
+              <div>
+                <dt>Evidencia</dt>
+                <dd>
+                  {system.runtime.evidence_mode === "quoted_v6"
+                    ? "Citas literales verificadas por el servidor"
+                    : "Selección de pasajes (modo heredado)"}
+                </dd>
+              </div>
+              <div>
+                <dt>Contexto y tiempo máximo</dt>
+                <dd>
+                  {system.runtime.context_tokens} tokens · {system.runtime.timeout_seconds} s por llamada
+                </dd>
+              </div>
+              <div>
+                <dt>Memoria y concurrencia</dt>
+                <dd>
+                  Modelo residente {system.runtime.keep_alive} · {system.runtime.max_concurrent_turns} consulta
+                  {system.runtime.max_concurrent_turns === 1 ? "" : "s"} a la vez
+                </dd>
+              </div>
+              <div>
+                <dt>Endpoint</dt>
+                <dd>{system.runtime.local_endpoint ? "En este equipo" : "Servidor externo configurado"}</dd>
+              </div>
+            </dl>
+          </section>
+          <section className="settingSection surface">
                 <div>
                   <h3>Prueba local de Ollama</h3>
                   <p>
@@ -208,8 +217,7 @@ export function SettingsView({
                     </p>
                   )}
                 </div>
-              </section>
-            )}
+          </section>
           <section className="settingSection surface">
             <div>
               <h3>Indexación y colecciones</h3>
@@ -225,9 +233,7 @@ export function SettingsView({
               </div>
               <div>
                 <dt>
-                  {system.embeddings.provider === "ollama" && !system.demo
-                    ? "Colección de última prueba"
-                    : "Colección activa"}
+                  Colección de última prueba
                 </dt>
                 <dd>
                   <code translate="no">

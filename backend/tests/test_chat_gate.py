@@ -10,8 +10,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 from test_pipeline import api as api  # shared real PostgreSQL fixture
 
-from app import agent, main
-from app.config import settings
+from app import agent, main, rag
 
 
 def sse_events(response):
@@ -35,7 +34,6 @@ def seed_tickets(workspace, titles):
 
 def unconfigure_provider(monkeypatch):
     monkeypatch.setattr(agent, "client", None)
-    monkeypatch.setattr(settings, "openai_api_key", "")
 
 
 def test_stream_direct_read_works_without_configured_provider(api, monkeypatch):
@@ -66,15 +64,20 @@ def test_stream_direct_read_with_configured_provider_needs_no_model(api, monkeyp
     assert sse_events(response)[-1]["type"] == "done"
 
 
-def test_model_query_still_requires_configured_provider(api, monkeypatch):
-    unconfigure_provider(monkeypatch)
-    for path in ("/api/chat", "/api/chat/stream"):
-        response = api.post(path, json={"message": "¿Cuál es la política de acceso?"})
-        assert response.status_code == 503, path
-        assert "OPENAI_API_KEY" in response.json()["detail"]
-    # Interpreted (non-exact) ticket reads still need a model and are refused up front.
-    response = api.post("/api/chat/stream", json={"message": "Muestra los tickets urgentes"})
-    assert response.status_code == 503
+def test_model_query_with_unreachable_ollama_is_a_sanitized_503(api, monkeypatch):
+    from app.providers import ProviderUnavailable
+
+    def unreachable(**kwargs):
+        raise ProviderUnavailable("No se puede conectar con Ollama. Inicia el servicio local.")
+
+    monkeypatch.setattr(agent.client.responses, "create", unreachable)
+    monkeypatch.setattr(rag.client, "embeddings", NS(create=unreachable), raising=False)
+    question = {"message": "¿Cuál es la política de acceso?"}
+    response = api.post("/api/chat", json=question)
+    assert response.status_code == 503 and "Ollama" in response.json()["detail"]
+    streamed = api.post("/api/chat/stream", json=question)
+    error = next(e for e in sse_events(streamed) if e["type"] == "error")
+    assert error["status"] == 503 and "Ollama" in error["message"]
     assert api.get("/api/conversations").json() == []
 
 

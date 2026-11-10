@@ -46,10 +46,13 @@ def diagnose(client, output_path):
         "retrieval": "Not measured; only expected public fixture documents supplied",
         "changes": "Native format removed; equivalent JSON contract appended as plain text",
         "limits": {
-            "max_calls": 2, "max_output_tokens_per_call": 2000,
+            "max_calls": 2,
+            "max_output_tokens_per_call": 2000,
             "timeout_seconds": settings.ollama_timeout_seconds,
-            "num_ctx": settings.ollama_num_ctx, "think": None,
-            "seed": 42, "keep_alive": 0,
+            "num_ctx": settings.ollama_num_ctx,
+            "think": None,
+            "seed": 42,
+            "keep_alive": 0,
         },
         "cases": [],
         "limitation": "Diagnostic only; not a paired RAG comparison or a release acceptance result",
@@ -61,7 +64,8 @@ def diagnose(client, output_path):
         try:
             _, _, meta = documentary_answer(client, case["question"], sources)
             result = {
-                "name": name, "expected_abstention": False,
+                "name": name,
+                "expected_abstention": False,
                 "abstained": bool(meta["abstention_reason"]),
                 "reason": meta["abstention_reason"],
                 "model_assessment_performed": meta["model_assessment_performed"],
@@ -70,14 +74,15 @@ def diagnose(client, output_path):
             }
         except (RuntimeError, ValueError, TypeError) as exc:
             # Safe class name only: upstream exceptions can carry private bodies.
-            result = {"name": name, "expected_abstention": False,
-                      "provider_error": type(exc).__name__}
+            result = {
+                "name": name,
+                "expected_abstention": False,
+                "provider_error": type(exc).__name__,
+            }
         result["duration_ms"] = round((time.perf_counter() - start) * 1000, 2)
         report["cases"].append(result)
         report["attempted_cases"] = len(report["cases"])
-        report["answered_cases"] = sum(
-            r.get("abstained") is False for r in report["cases"]
-        )
+        report["answered_cases"] = sum(r.get("abstained") is False for r in report["cases"])
         output_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     return report
 
@@ -87,8 +92,8 @@ def main():
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
-    if not args.live or settings.demo_mode or settings.generation_provider != "ollama":
-        parser.error("Requires --live, DEMO_MODE=false and GENERATION_PROVIDER=ollama")
+    if not args.live:
+        parser.error("Requires --live")
     report = diagnose(FormatOffDiagnostic(), args.output)
     print(json.dumps(report, ensure_ascii=False, indent=2))
 

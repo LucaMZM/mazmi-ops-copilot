@@ -21,25 +21,22 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-mazmi}:${POSTGRES_PASSWORD:-mazmi_local_change_me}@db:5432/${POSTGRES_DB:-mazmi_ops}
-      GENERATION_PROVIDER: ${GENERATION_PROVIDER:-gemini}
-      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-gemini}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash-lite}
-      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-2}
-      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      # Ollama se ejecuta en el equipo anfitrión, no en Docker (acceso a GPU y memoria del Mac).
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL_DOCKER:-http://host.docker.internal:11434}
       OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-qwen3:4b}
       OLLAMA_EMBEDDING_MODEL: ${OLLAMA_EMBEDDING_MODEL:-embeddinggemma}
-      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-}
-      EMBEDDING_REVISION: ${EMBEDDING_REVISION:-legacy}
-      TTS_PROVIDER: ${TTS_PROVIDER:-piper}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
-      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
-      OPENAI_TTS_MODEL: ${OPENAI_TTS_MODEL:-gpt-4o-mini-tts}
-      OPENAI_TTS_VOICE: ${OPENAI_TTS_VOICE:-marin}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-4096}
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-120}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-5m}
+      OLLAMA_REASONING: ${OLLAMA_REASONING:-off}
+      EMBEDDING_DIMENSIONS: ${EMBEDDING_DIMENSIONS:-768}
+      EVIDENCE_MODE: ${EVIDENCE_MODE:-quoted_v6}
+      CHAT_MAX_CONCURRENT: ${CHAT_MAX_CONCURRENT:-1}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       CORS_ORIGINS: http://localhost:${WEB_PORT:-3000},http://127.0.0.1:${WEB_PORT:-3000}
       RETRIEVAL_MIN_SCORE: ${RETRIEVAL_MIN_SCORE:-0.25}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     depends_on:

@@ -8,7 +8,6 @@ from pydantic import ValidationError
 
 from app import agent, main, rag
 from app.auth import Principal, principal
-from app.config import settings
 from app.evidence import ASSESSMENT_FAILURE
 from app.schemas import TicketPayload
 
@@ -72,7 +71,6 @@ def test_tool_payload_validation():
 
 
 def test_missing_key(monkeypatch):
-    monkeypatch.setattr(settings, "openai_api_key", "")
     main.app.dependency_overrides[principal] = lambda: Principal("test", "test", "test@example.com")
     api = TestClient(main.app)
     assert api.post("/api/chat", json={"message": "hola"}).status_code == 503
