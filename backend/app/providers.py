@@ -112,6 +112,22 @@ class Ollama:
             values = response.json()["embeddings"]
             return NS(data=[NS(index=i, embedding=v) for i, v in enumerate(values)])
 
+    @staticmethod
+    def forced_tool(kwargs):
+        """The single authorized tool, when its call is requested as grammar-constrained JSON.
+
+        Measured with Qwen3 4B: with native tool calling the model ignores ``think=false`` and
+        writes ~900 tokens of reasoning as plain content before the call (90-120 s per ticket
+        proposal on 8 GB). The server has already decided which one tool is allowed, so with
+        reasoning off the arguments are requested through the same JSON-schema grammar used
+        for evidence, which leaves no room for prose. Authorization, argument validation and
+        human confirmation are unchanged and stay on the server.
+        """
+        tools = kwargs.get("tools") or []
+        if settings.ollama_reasoning == "off" and len(tools) == 1 and not kwargs.get("text"):
+            return tools[0]
+        return None
+
     def payload(self, kwargs):
         messages = [{"role": "system", "content": kwargs.get("instructions", "")}]
         names = {}
@@ -166,6 +182,14 @@ class Ollama:
         }
         if kwargs.get("text"):
             payload["format"] = kwargs["text"]["format"]["schema"]
+        if tool := self.forced_tool(kwargs):
+            payload["tools"] = []
+            payload["format"] = tool["parameters"]
+            payload["options"]["num_predict"] = min(payload["options"]["num_predict"], 700)
+            messages[0]["content"] += (
+                f"\nDevuelve solo el objeto JSON con los argumentos de {tool['name']} "
+                f"({tool['description']}). Usa únicamente información de la petición, en su idioma."
+            )
         if settings.ollama_reasoning == "off":
             # Measured default (VALIDATION.md): with reasoning on, Qwen3 4B spent its whole
             # output budget thinking (timeouts, empty answers). Disable the reasoning phase
@@ -176,7 +200,7 @@ class Ollama:
             payload["options"].update({"temperature": 0.7, "top_p": 0.8, "top_k": 20, "min_p": 0})
         return payload
 
-    def result(self, data, content=None, calls=None, thinking_chars=None):
+    def result(self, data, content=None, calls=None, thinking_chars=None, forced_tool=None):
         if not isinstance(data, dict):
             raise ProviderUnavailable("Respuesta Ollama incompatible")
         if "error" in data:
@@ -188,6 +212,19 @@ class Ollama:
             raise ProviderUnavailable("Respuesta Ollama sin mensaje válido")
         text = message.get("content", "") if content is None else content
         tool_calls = calls if calls is not None else message.get("tool_calls", [])
+        if (
+            forced_tool
+            and not tool_calls
+            and isinstance(text, str)
+            and data.get("done")
+            and data.get("done_reason", "stop") == "stop"
+        ):
+            # Grammar-constrained arguments become the one authorized call. Anything that is
+            # not a JSON object is an incompatible answer, never a guessed call.
+            arguments = json.loads(text)
+            if not isinstance(arguments, dict):
+                raise ProviderUnavailable("Argumentos de herramienta Ollama incompatibles")
+            tool_calls, text = [{"function": {"name": forced_tool, "arguments": arguments}}], ""
         if (
             not isinstance(text, str)
             or len(text) > 100000
@@ -250,15 +287,17 @@ class Ollama:
 
     def create(self, **kwargs):
         payload = self.payload(kwargs)
+        tool = self.forced_tool(kwargs)
+        forced = tool["name"] if tool else None
         if payload["stream"]:
-            return self.stream(payload)
+            return self.stream(payload, forced)
         with self.http() as client:
             response = client.post("/api/chat", json=payload)
             response.raise_for_status()
-            return self.result(response.json())
+            return self.result(response.json(), forced_tool=forced)
 
     @contextmanager
-    def stream(self, payload):
+    def stream(self, payload, forced_tool=None):
         with self.http() as client, client.stream("POST", "/api/chat", json=payload) as response:
             response.raise_for_status()
 
@@ -286,10 +325,10 @@ class Ollama:
                     calls.extend(new_calls)
                     if len(content) > 100000 or len(calls) > 4:
                         raise ProviderUnavailable("Respuesta Ollama demasiado grande")
-                    if delta:
+                    if delta and not forced_tool:  # JSON argument fragments are not answer text.
                         yield NS(type="response.output_text.delta", delta=delta)
                     if data.get("done"):
-                        result = self.result(data, content, calls, thinking_chars)
+                        result = self.result(data, content, calls, thinking_chars, forced_tool)
                         yield NS(
                             type="response.completed"
                             if result.status == "completed"
