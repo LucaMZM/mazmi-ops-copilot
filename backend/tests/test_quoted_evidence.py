@@ -402,3 +402,30 @@ def test_verified_quotes_focus_the_answer_when_the_question_shares_no_words_with
     anchored = focused_quote(question, text, anchors=["La tarifa es de 4,80 euros por bulto"])
     assert "4,80 euros" in anchored and "60 días de preaviso" not in anchored
     assert len(anchored) < len(text) / 2
+
+
+def test_old_version_question_quoted_from_both_versions_is_rechecked_with_the_old_one_only():
+    sources = [
+        {"content": NEW, "filename": "tele-2025.md"},
+        {"content": OLD, "filename": "tele-2023.pdf", "superseded": True},
+    ]
+    both = {
+        "status": "sufficient",
+        "evidence": [
+            {"passage_id": 2, "quote": "Se permite teletrabajar hasta 3 días por semana."},
+            {"passage_id": 1, "quote": "Se permite teletrabajar hasta 2 días por semana."},
+        ],
+    }
+    old_only = {"reason": "La versión de 2023 lo indica.", "answers": True, "answer": "3 días"}
+    question = "¿Cuántos días de teletrabajo permitía la política de 2023?"
+    client, calls = scripted(both, NO, old_only)
+    text, _, meta = documentary_answer(client, question, sources)
+    assert meta["abstention_reason"] is None and meta["assessment"]["version_retry"] is True
+    assert "3 días" in text and "hasta 2 días" not in text and meta["citations"] == [2]
+    retried = json.loads(calls[2]["input"][0]["content"])["quotes"]
+    assert [q["quote"] for q in retried] == ["Se permite teletrabajar hasta 3 días por semana."]
+    # The retry is not a second chance for anything else: a current-version question never
+    # reaches superseded passages, and a failed retry is still an abstention.
+    client, calls = scripted(both, NO, NO)
+    _, _, meta = documentary_answer(client, question, sources)
+    assert meta["abstention_reason"] == "insufficient_evidence" and len(calls) == 3

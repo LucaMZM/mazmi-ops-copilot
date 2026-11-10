@@ -844,25 +844,40 @@ def _quoted_assessment(client, question, history, items, visible, meta, finish, 
         return finish("document_instruction_detected")
     if emit:
         emit({"type": "status", "text": "Verificando que las citas responden a la pregunta…"})
-    check, reason = _json_call(
-        client,
-        meta,
-        CHECK_INSTRUCTIONS,
-        {
-            "question": question,
-            # Origin (file and section) is context for the quote, never evidence itself.
-            "quotes": [
-                {"source": _origin(sources[i - 1]), "quote": q}
-                for i, qs in quotes.items()
-                for q in qs
-            ],
-        },
-        AnswerCheck,
-        "answer_check",
-    )
+
+    def check_quotes(subset):
+        check, reason = _json_call(
+            client,
+            meta,
+            CHECK_INSTRUCTIONS,
+            {
+                "question": question,
+                # Origin (file and section) is context for the quote, never evidence itself.
+                "quotes": [
+                    {"source": _origin(sources[i - 1]), "quote": q}
+                    for i, qs in subset.items()
+                    for q in qs
+                ],
+            },
+            AnswerCheck,
+            "answer_check",
+        )
+        return check, reason, bool(check and check.answers and check.answer.strip())
+
+    check, reason, answered = check_quotes(quotes)
     if reason:
         return finish(reason)
-    trace["answer_check"] = bool(check.answers and check.answer.strip())
-    if not trace["answer_check"]:
+    stale = {i for i in quotes if sources[i - 1].get("superseded")}
+    if not answered and stale and stale != set(quotes) and HISTORIC.search(normalize(question)):
+        # A question about an old version quoted from both versions gives the check two
+        # different values. Evidence from the superseded version alone must answer it.
+        quotes = {i: quotes[i] for i in sorted(stale)}
+        selected = [items[i - 1] for i in sorted(quotes)]
+        trace["version_retry"] = True
+        check, reason, answered = check_quotes(quotes)
+        if reason:
+            return finish(reason)
+    trace["answer_check"] = answered
+    if not answered:
         return finish("insufficient_evidence")
     return finish(selected=selected, quotes=quotes, lead=check.answer)
