@@ -7,12 +7,9 @@ from app.config import settings
 from app.providers import ProviderUnavailable
 
 
-def test_local_voice_missing_assets_never_falls_back_to_cloud(monkeypatch):
-    monkeypatch.setattr(settings, "tts_provider", "piper")
+def test_local_voice_missing_assets_report_unavailable(monkeypatch):
     monkeypatch.setattr(settings, "piper_model_path", "")
     monkeypatch.setattr(settings, "stt_model_path", "")
-    monkeypatch.setattr(settings, "openai_api_key", "")
-    monkeypatch.setattr(speech, "openai_client", lambda: pytest.fail("No cloud fallback"))
     with pytest.raises(ProviderUnavailable, match="Piper"):
         speech.synthesize("test")
     with pytest.raises(ProviderUnavailable, match="STT local"):
@@ -23,7 +20,6 @@ def test_piper_uses_local_files_and_no_shell(monkeypatch, tmp_path):
     model = tmp_path / "voice.onnx"
     model.write_bytes(b"fake")
     Path(str(model) + ".json").write_text("{}")
-    monkeypatch.setattr(settings, "tts_provider", "piper")
     monkeypatch.setattr(settings, "piper_model_path", str(model))
 
     def run(args, **kwargs):

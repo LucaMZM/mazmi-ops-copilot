@@ -1,7 +1,7 @@
-"""Small adapters for the existing Responses-shaped application contract.
+"""Local Ollama adapter for the application's Responses-shaped contract.
 
-Ollama uses its native HTTP API, not assumed OpenAI Responses compatibility.
-No downloads, cloud fallback, automatic execution of tools or private-body logs.
+Uses Ollama's native HTTP API. No downloads, cloud providers, fallbacks, automatic
+execution of tools or private-body logs.
 """
 
 import json
@@ -10,34 +10,12 @@ from types import SimpleNamespace as NS
 from uuid import uuid4
 
 import httpx
-from openai import OpenAI
 
 from .config import settings
 
 
 class ProviderUnavailable(RuntimeError):
     pass
-
-
-class ProviderQuotaExceeded(ProviderUnavailable):
-    pass
-
-
-def require_config(provider):
-    if settings.demo_mode:
-        settings.guard_demo()
-        return
-    if provider == "gemini" and not settings.gemini_api_key:
-        raise ProviderUnavailable(
-            "Gemini seleccionado: configura GEMINI_API_KEY solo en el servidor."
-        )
-    if provider == "openai" and not settings.openai_api_key:
-        raise ProviderUnavailable("OpenAI seleccionado: configura OPENAI_API_KEY o usa Ollama.")
-
-
-def openai_client():
-    require_config("openai")
-    return OpenAI(api_key=settings.openai_api_key, timeout=120, max_retries=0)
 
 
 class Ollama:
@@ -98,7 +76,7 @@ class Ollama:
                     "input": input,
                     "dimensions": dimensions,
                     "truncate": False,
-                    "keep_alive": 0,
+                    "keep_alive": settings.ollama_keep_alive,
                 },
             )
             response.raise_for_status()
@@ -137,16 +115,15 @@ class Ollama:
         payload = {
             "model": kwargs["model"],
             "messages": messages,
-            # False is not supported by every thinking model (including the
-            # installed Qwen3 manifest). Let Ollama separate reasoning using its
-            # model default; never forward message.thinking to application text.
+            # "on": let Ollama separate reasoning with the model default. Never forward
+            # message.thinking to application text.
             "think": None,
             "stream": bool(kwargs.get("stream")),
-            "keep_alive": 0,
+            "keep_alive": settings.ollama_keep_alive,
             "options": {
                 # Preserve model sampling defaults: Qwen3 explicitly warns that
                 # greedy decoding can cause endless reasoning repetitions.
-                "seed": 42,
+                "seed": kwargs.get("seed", 42),
                 "num_ctx": settings.ollama_num_ctx,
                 "num_predict": kwargs.get("max_output_tokens", 2000),
             },
@@ -160,11 +137,11 @@ class Ollama:
         }
         if kwargs.get("text"):
             payload["format"] = kwargs["text"]["format"]["schema"]
-        if settings.ollama_reasoning == "no_think_directive":
-            # Opt-in, measured alternative (VALIDATION.md, "Diagnóstico Qwen3"): disable
-            # the reasoning phase so the output budget is spent on the answer/JSON.
-            # Uses Qwen3's documented soft switch plus its recommended non-thinking
-            # sampling (temperature 0.7, top_p 0.8, top_k 20). Never greedy decoding.
+        if settings.ollama_reasoning == "off":
+            # Measured default (VALIDATION.md): with reasoning on, Qwen3 4B spent its whole
+            # output budget thinking (timeouts, empty answers). Disable the reasoning phase
+            # with Qwen3's documented soft switch and its recommended non-thinking sampling
+            # (temperature 0.7, top_p 0.8, top_k 20). Never greedy decoding.
             payload["think"] = False
             messages[0]["content"] = (messages[0]["content"] + "\n/no_think").strip()
             payload["options"].update({"temperature": 0.7, "top_p": 0.8, "top_k": 20, "min_p": 0})
@@ -209,8 +186,12 @@ class Ollama:
         metrics = {
             key: data[key]
             for key in (
-                "prompt_eval_count", "eval_count", "total_duration", "load_duration",
-                "prompt_eval_duration", "eval_duration",
+                "prompt_eval_count",
+                "eval_count",
+                "total_duration",
+                "load_duration",
+                "prompt_eval_duration",
+                "eval_duration",
             )
             if type(data.get(key)) is int and 0 <= data[key] <= 2**63 - 1
         }
@@ -219,8 +200,11 @@ class Ollama:
         )
         metrics["content_chars"] = len(text)
         metrics["thinking_chars"] = (
-            thinking_chars if thinking_chars is not None else
-            len(message["thinking"]) if isinstance(message.get("thinking"), str) else 0
+            thinking_chars
+            if thinking_chars is not None
+            else len(message["thinking"])
+            if isinstance(message.get("thinking"), str)
+            else 0
         )
         return NS(
             provider_metrics=metrics,
@@ -289,35 +273,9 @@ class Ollama:
             yield events()
 
 
-class OpenAIAdapter:
-    @property
-    def responses(self):
-        return openai_client().responses
-
-    @property
-    def embeddings(self):
-        return openai_client().embeddings
-
-
 def generation_client():
-    if settings.demo_mode:
-        from .demo import DemoProvider
-
-        return DemoProvider()
-    if settings.generation_provider == "gemini":
-        from .gemini import Gemini
-
-        return Gemini()
-    return Ollama() if settings.generation_provider == "ollama" else OpenAIAdapter()
+    return Ollama()
 
 
 def embeddings_client():
-    if settings.demo_mode:
-        from .demo import DemoProvider
-
-        return DemoProvider()
-    if settings.embedding_provider == "gemini":
-        from .gemini import Gemini
-
-        return Gemini()
-    return Ollama() if settings.embedding_provider == "ollama" else OpenAIAdapter()
+    return Ollama()

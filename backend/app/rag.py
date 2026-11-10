@@ -56,10 +56,7 @@ def chunk_pages(pages: list[tuple[int | None, str]], filename: str = "") -> list
     """Split extracted pages into stored chunks (page metadata only when real)."""
     if settings.chunking_strategy == "flat_v1":
         return [Chunk(page, chunk) for page, text in pages for chunk in split_text(text)]
-    return [
-        Chunk(page, chunk.content, chunk.section)
-        for page, chunk in structured_chunks(pages)
-    ]
+    return [Chunk(page, chunk.content, chunk.section) for page, chunk in structured_chunks(pages)]
 
 
 def _docx_text(doc) -> str:
@@ -123,25 +120,23 @@ def extract_pages(filename: str, raw: bytes) -> list[tuple[int | None, str]]:
     raise ValueError("Formato no soportado. Usa PDF, DOCX, TXT o MD.")
 
 
+def embedding_revision():
+    """Digest of the installed embedding model; part of every collection identity."""
+    return client.digest(settings.embedding_model)
+
+
 def embedding_collection():
-    if settings.demo_mode:
-        settings.guard_demo()
-        return f"demo:deterministic-v1:{settings.vector_dimensions}:fixture-only"
-    revision = settings.embedding_revision
-    if settings.embedding_provider == "ollama":
-        revision = client.digest(settings.embedding_model) + ":retrieval-prefix-v1"
-    if settings.embedding_provider == "gemini":
-        revision += ":retrieval-prefix-v1"
-    return f"{settings.embedding_provider}:{settings.embedding_model}:{settings.vector_dimensions}:{revision}"
+    return (
+        f"ollama:{settings.embedding_model}:{settings.vector_dimensions}:"
+        f"{embedding_revision()}:retrieval-prefix-v1"
+    )
 
 
 def embed_texts(texts: list[str], *, query=False) -> list[list[float]]:
     before = embedding_collection()
     inputs = texts
-    if (
-        settings.embedding_provider == "ollama"
-        and settings.embedding_model.split(":")[0] == "embeddinggemma"
-    ) or settings.embedding_provider == "gemini":
+    if settings.embedding_model.split(":")[0] == "embeddinggemma":
+        # EmbeddingGemma's documented retrieval prompts.
         prefix = "task: search result | query: " if query else "title: none | text: "
         inputs = [prefix + text for text in texts]
     result = client.embeddings.create(

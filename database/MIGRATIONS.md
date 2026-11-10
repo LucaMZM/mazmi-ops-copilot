@@ -41,3 +41,11 @@ Solo aditiva: no elimina, renombra ni cambia tipos de columnas existentes.
 - Tabla `chat_requests` para idempotencia de turnos de chat por `(user_id, request_id)`; la aplicación purga filas de más de 24 horas del mismo usuario al escribir.
 
 Precauciones para bases existentes: las mismas de 003/004 (backup restaurable, espacio, ventana de mantenimiento). El `UPDATE` de relleno de `updated_at` reescribe las filas de `conversations` (normalmente pequeña) bajo el `statement_timeout` de 120 s del runner; `ADD COLUMN section` sin valor por defecto es solo de catálogo. Validado en esta sesión sobre esquemas temporales de PostgreSQL 17.11 (suite de integración y ejecución doble del runner). No se aplicó a ninguna base del usuario.
+
+## IA solo local (noviembre de 2026)
+
+Sin migración nueva (la siguiente sería la 006): no se modifica ninguna migración existente ni se borra nada.
+
+- Las migraciones 001 y 004 conservan sus valores por defecto históricos (`workspaces` «MAZMI Demo» y la etiqueta de colección `openai:…:legacy`). Son datos de esquema inmutables; **la aplicación ya no los usa**: cada usuario crea su propio workspace al registrarse y toda colección nueva se etiqueta `ollama:<modelo>:<dimensiones>:<digest>:retrieval-prefix-v1`.
+- Los documentos indexados con proveedores anteriores (Gemini, OpenAI o demo) siguen en la base pero pertenecen a otra colección y **no se recuperan** hasta reindexarlos desde *Conocimiento*. El runner no convierte vectores entre modelos.
+- Para volver a EmbeddingGemma con las mismas dimensiones no hace falta reindexar si el digest de Ollama no cambia.

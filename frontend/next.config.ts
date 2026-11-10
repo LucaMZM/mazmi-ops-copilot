@@ -20,6 +20,9 @@ const nextConfig: NextConfig = {
   output: "standalone",
   turbopack: { root: process.cwd() },
   poweredByHeader: false,
+  // Un modelo local en frío puede tardar más de los 30 s que Next concede por defecto al proxy.
+  // Debe cubrir CHAT_STREAM_TIMEOUT_SECONDS del backend (330 s).
+  experimental: { proxyTimeout: 340_000 },
   async headers() {
     return [
       {

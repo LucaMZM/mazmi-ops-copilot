@@ -455,13 +455,10 @@ time {
 .content {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   gap: var(--space-2);
-}
-.content:not(:has(.demoRibbon)) {
-  grid-template-rows: auto minmax(0, 1fr);
 }
 
 /* ---------- Sidebar ---------- */
@@ -680,17 +677,6 @@ time {
 }
 
 /* ---------- Topbar and feedback ---------- */
-.demoRibbon {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-  padding: 6px var(--space-4);
-  border-radius: var(--radius-pill);
-  background: var(--decision-soft);
-  color: var(--decision-strong);
-  font-size: var(--text-xs);
-}
 .topbar {
   min-width: 0;
   display: flex;
@@ -880,10 +866,6 @@ time {
 }
 .providerContext.warn .providerDot {
   background: var(--decision);
-}
-.providerContext.demo .providerDot {
-  background: var(--decision);
-  box-shadow: 0 0 0 3px var(--decision-soft);
 }
 .chatWelcome {
   display: grid;

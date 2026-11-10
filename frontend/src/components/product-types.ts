@@ -55,16 +55,24 @@ export type Message = {
   failed?: boolean;
 };
 export type ProviderInfo = {
-  provider: string;
+  provider: "ollama";
   model: string;
-  state: "configured" | "not_configured" | "demo";
-  verification: "not_checked" | "simulated" | "passed" | "failed";
+  verification: "not_checked" | "passed" | "failed";
   checked_at?: string;
 };
+export type RuntimeInfo = {
+  local_endpoint: boolean;
+  reasoning: "off" | "on";
+  context_tokens: number;
+  timeout_seconds: number;
+  keep_alive: string;
+  max_concurrent_turns: number;
+  evidence_mode: "quoted_v6" | "passage_ids_v5";
+};
 export type SystemInfo = {
-  demo: boolean;
   generation: ProviderInfo;
   embeddings: ProviderInfo & { dimensions: number; collection: string | null };
+  runtime: RuntimeInfo;
   local_check?: {
     status: "passed" | "failed";
     checked_at: string;

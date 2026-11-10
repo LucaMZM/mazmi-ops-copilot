@@ -1,149 +1,69 @@
-# Local AI: Ollama profile and verification
+# IA local con Ollama
 
-The opt-in [Ollama profile](profiles/ollama.env.example) runs generation and embeddings without a paid API key. It preserves the deterministic demo and the optional Gemini/OpenAI adapters. The repository-wide defaults remain Gemini; selecting this profile changes only the backend process you start. The application never downloads models or switches to a paid fallback.
+MAZMI genera respuestas y embeddings **únicamente con Ollama**, en tu equipo. No hay claves, proveedores de pago ni cambio automático a otro servicio. Esta página explica cómo se usa el motor, qué modelos requiere, cómo se gestiona el razonamiento de Qwen3 y cómo comprobar que todo funciona de verdad.
 
-## Reuse an existing installation
+## Requisitos
 
-Check before changing anything:
+- Ollama (probado con 0.40.7) escuchando en `http://127.0.0.1:11434`.
+- Modelos ya instalados: `qwen3:4b` (generación, ≈2,5 GB) y `embeddinggemma` (embeddings 768 d, ≈0,6 GB).
+- La aplicación **nunca descarga modelos**. Si falta uno, devuelve un 503 explícito.
 
 ```bash
-ollama --version
-ollama list
-ollama ps
+ollama list                         # modelos instalados
 curl --fail http://127.0.0.1:11434/api/version
+make check-local                    # capacidades reales: JSON estructurado, streaming, embeddings
 ```
 
-Use the existing daemon if it is already listening. Do not start a second server, reinstall Ollama or change another project's service configuration. On the validation machine, the existing installation is Ollama **0.40.7**, with `qwen3:4b` and `embeddinggemma` already installed. Inventory is not proof that a model completes a request; see [the dated evidence](VALIDATION.md).
+## Configuración
 
-If a required model is absent, stop the local-model check and review disk/memory requirements before authorizing a download. No model download is part of the setup commands here. Do not silently substitute Qwen3 1.7B or another embedding model.
+Las variables están en [.env.example](.env.example). Las relevantes:
 
-## Start the isolated local profile
+| Variable | Valor por defecto | Efecto |
+|---|---|---|
+| `OLLAMA_CHAT_MODEL` | `qwen3:4b` | Modelo de generación |
+| `OLLAMA_EMBEDDING_MODEL` | `embeddinggemma` | Modelo de embeddings (768 d) |
+| `OLLAMA_REASONING` | `off` | `off` desactiva la fase de razonamiento de Qwen3; `on` la mantiene |
+| `OLLAMA_KEEP_ALIVE` | `5m` | Tiempo que el modelo permanece en memoria |
+| `OLLAMA_NUM_CTX` | `4096` | Contexto por petición |
+| `OLLAMA_TIMEOUT_SECONDS` | `120` | Límite de cada llamada al modelo |
+| `CHAT_MAX_CONCURRENT` | `1` | Consultas de IA simultáneas |
+| `EVIDENCE_MODE` | `quoted_v6` | Evidencia con citas verificadas (ver abajo) |
 
-Follow the native dependency/database setup in [README.md](README.md). Keep the real connection string privately in the root `.env`; use a dedicated evaluation database for experiments. Before starting against an existing database, read [database/MIGRATIONS.md](database/MIGRATIONS.md).
+Los valores antiguos `model_default` y `no_think_directive` de `OLLAMA_REASONING` se siguen aceptando.
+
+## Por qué Qwen3 4B fallaba y qué se cambió
+
+El diagnóstico de MAZMI 2.0 (resultados en [el histórico](docs/HISTORICO-VALIDACION-2.0.md)) mostró tres causas independientes:
+
+1. **Timeouts y respuestas vacías: razonamiento.** Con la fase de razonamiento activada, Qwen3 4B gastaba casi todo el presupuesto de 2000 tokens «pensando» antes de escribir el JSON (`done_reason=length`, `content` vacío). Ahora el razonamiento está desactivado por defecto con el conmutador oficial de Qwen3 (`think=false`, `/no_think`) y su muestreo recomendado (temperatura 0,7, top_p 0,8, top_k 20; nunca decodificación voraz).
+2. **Evidencia insuficiente aceptada.** Sin razonamiento, el modelo marcaba como suficientes pasajes del mismo tema que no contenían el dato. Un único ID de pasaje no es comprobable. Ahora el modelo debe **copiar una cita literal por cada parte de la pregunta**; el servidor comprueba que cada cita existe en el pasaje que nombra y una segunda llamada, con solo la pregunta y las citas verificadas, confirma que contienen el dato pedido. Las guardas deterministas (alcance, hechos, condiciones, contradicciones literales, instrucciones incrustadas) se mantienen antes y después.
+3. **Falsas abstenciones por una guarda léxica.** La guarda de «límite/importe» exigía esas palabras exactas en el documento y rechazaba «alojamiento máximo». Se amplió con sinónimos (máximo, tope, techo).
+
+El texto mostrado al usuario sale siempre del pasaje almacenado, nunca del modelo.
+
+## Memoria y recursos
+
+Qwen3 4B (Q4_K_M) y EmbeddingGemma ocupan ≈3 GB residentes juntos con contexto 4096. En un Mac de 8 GB deja poco margen: ejecuta una consulta de IA a la vez, cierra aplicaciones pesadas y no lances compilaciones durante una evaluación. `OLLAMA_KEEP_ALIVE=5m` evita recargar el modelo entre preguntas; usa `0` si prefieres liberar memoria al instante.
+
+## Comprobar que funciona (evidencia real)
 
 ```bash
-# From the repository root, with the existing virtualenv active:
-export MAZMI_ENV_FILE="$PWD/profiles/ollama.env.example"
 cd backend
-python -m app.migrate
-uvicorn app.main:app --host 127.0.0.1 --port 8010
-
-# Separate terminal, from the repository root:
-cd frontend
-BACKEND_URL=http://127.0.0.1:8010 npm run dev
+# Pipeline completo (HTTP, PostgreSQL real, Ollama real) en una base NUEVA y vacía *_eval o *_local:
+DATABASE_URL=postgresql://…/mi_prueba_eval APP_ENV=development \
+  python -m app.evaluate_local --live --cases evals/local_cases.json --output /ruta/resultado.json
 ```
 
-The additional profile is read after the root `.env`; exported environment variables take precedence over both. Inspect conflicting exported `GENERATION_PROVIDER`, `EMBEDDING_PROVIDER` or `DEMO_MODE` values before debugging the profile. Keep private overrides out of the tracked example. `APP_ENV=development`, `DEMO_MODE=false`, both providers `ollama`, context **4096**, request timeout **120 seconds** and configured embedding dimensions **768** are explicit in the profile. Restart the backend after configuration changes. No `OPENAI_API_KEY` or `GEMINI_API_KEY` is required for these operations.
+El evaluador verifica además que **cada cita entre «» existe literalmente** en el fragmento que cita, comprueba datos esperados en la respuesta y registra latencias p50/p95 y memoria pico de Ollama. Conjuntos disponibles: `local_cases.json` (los 8 originales), `local_dev_v3.json` (desarrollo) y `local_holdout_v3.json` (reservado, no usado para ajustar nada). Resultados y fallos: [VALIDATION.md](VALIDATION.md).
 
-This session used 8010 because another project's existing service occupied 8000; it was left untouched. For a production frontend build, set the same `BACKEND_URL` when running `npm run build`, then `npm start`. Changing it only at startup does not rewrite a previously built proxy. Check backend health at `http://127.0.0.1:8010/health`.
+## Comparar otro modelo
 
-Start the frontend with its existing dependencies. Open localhost:3000, register a local account and select a workspace. Settings reports configuration separately from verification. **Check local** explicitly runs fictional structured-output and embedding requests; GET `/api/system` itself performs no provider network requests. A result belongs to that process and configuration, expires after **300 seconds**, and does not prove continuous liveness or that all product journeys passed. Concurrent probes are rejected rather than queued indefinitely. A failed probe is shown honestly and does not disable ordinary text input.
+No se ha descargado ningún modelo adicional. Para evaluar Qwen3 8B o Qwen3.5 4B hace falta tu autorización (descarga y disco) y espacio libre; en este equipo hay poco. La comparación sería idéntica y medible: `ollama pull <modelo>` y, con `OLLAMA_CHAT_MODEL=<modelo>`, repetir los tres conjuntos anteriores en bases nuevas, comparando respuestas correctas, falsas abstenciones, respuestas sin soporte, p50/p95 y memoria pico.
 
-## Bounded capability check
+## Voz opcional
 
-With the profile still exported and the daemon idle:
+Faster-Whisper (dictado) y Piper (lectura) son opcionales y locales; nunca se descargan solos. Configura `STT_MODEL_PATH` y `PIPER_MODEL_PATH` con rutas absolutas a modelos ya descargados. La voz no está verificada en este equipo; sin ella el chat escrito funciona igual.
 
-```bash
-# From backend; do not run alongside a build or another inference suite:
-python -m app.check_local
-```
+## Docker (opcional)
 
-This command checks installed model metadata, Spanish generation, structured JSON validated by Pydantic, streamed text deltas, a tool proposal with a synthetic read-only result, actual embedding dimensions and a fresh request after closing an early stream. It neither executes a tool nor writes documents/database data. Exit status is nonzero on failure. Its fixture prompts are intentionally public; do not substitute private documents into shared diagnostic output.
-
-A transport close does not establish immediate GPU cancellation. Capability advertising in `/api/show`, accepted HTTP parameters and a successful fixture are different observations. Initial real probes exposed incompatible thinking/sampling settings. With the installed Qwen3 preset, `think=null` (model default), seed 42 and a 1024-token budget produced the exact Spanish greeting in 23.305 seconds. The adapter preserves the model sampling defaults (observed temperature 0.6, top_p 0.95, top_k 20, min_p 0), uses context 4096 and never forwards the separate thinking field as an answer. Hard-coded greedy sampling and unsupported `think=false` were removed.
-
-The later [full smoke report](backend/evals/ollama-smoke-results.json) preserves five successful capabilities and a failed counting-based cancellation fixture. A revised greeting-based early close and subsequent fresh request passed in a [separate selected check](backend/evals/ollama-cancellation-results.json). This cumulatively verifies the capabilities; it is not a single all-green full smoke. The [real RAG report](backend/evals/local-live-results.json) records four indexed policies, document Recall@6/MRR of 1.0, four correct negative abstentions and **two false abstentions out of four answerable questions**. The ticket-read journey separately returned a controlled 503 at the 120-second timeout. Simple function-calling fixtures passing does not establish reliable completion of every agent request. Do not increase context or hide failures to advertise a validated release.
-
-Ollama uses native `/api/chat`, `/api/embed`, `/api/tags` and `/api/show` through httpx, not the OpenAI Responses protocol. The adapter maps JSON Schema, NDJSON streaming, function arguments and tool results to the application's internal contract. Backend schema validation, authorization, extractive evidence selection and confirmation remain authoritative.
-
-## Resources on an 8 GB Mac
-
-The observed MacBook Air M2 has 8 GB unified memory. Installed files are approximately **2.50 GB** for Qwen3 4B (`Q4_K_M`, 2,497,293,931 bytes) and **622 MB** for EmbeddingGemma (`BF16`, 621,875,917 bytes). File size does not equal resident memory. Context/KV cache, model reloads, browser, Next.js and PostgreSQL all compete for the same memory; measure pressure and latency on the target machine.
-
-Serialize tests, builds and inference. A dedicated daemon can use `OLLAMA_NUM_PARALLEL=1` and `OLLAMA_MAX_LOADED_MODELS=1`; these are **daemon-start settings**, not application profile variables, and must not silently reconfigure a daemon shared with another project. The adapter requests `keep_alive=0` so models are released between calls, trading memory for reload latency. Do not assume generation and embeddings remain resident together. Close unnecessary applications, keep room for database backups and stop if memory pressure becomes sustained. A larger-memory machine is preferable for repeated evaluation; no minimum latency or hardware throughput is promised.
-
-## Collections, reindexing and migrations
-
-EmbeddingGemma is configured for 768 dimensions. The smoke test must measure the returned length; metadata advertising 768 is not the same measurement. Inputs have distinct document/query prefixes; `truncate=false` rejects overlong inputs rather than silently changing them. EmbeddingGemma's documented input context is 2048 tokens, so long chunks and questions need explicit boundary tests.
-
-Collection identity includes provider, model, dimensions, Ollama digest and prefix revision. Equal dimensions do not make demo, Gemini, OpenAI and Ollama vectors interchangeable. Both vector and FTS retrieval filter workspace, ready document state and the active collection before fusion. A document can remain visible but incompatible until explicitly reindexed in Knowledge. Reindexing preserves stored text/IDs and replaces vectors/metadata transactionally; failure rolls back to the previous collection. It does not retain a second vector version.
-
-Migration **003** adds full-text search; **004** separates embedding collections and changes vector indexing. Existing OpenAI vectors are preserved, not converted to Ollama vectors. There is **no migration 005** for this release. Back up, test restoration, check free space and plan for table/index locks before applying migrations to a database with data. Never fix compatibility by editing metadata or marking a migration applied manually.
-
-## Reproducible product evaluation
-
-Use short fictional purchasing, incident, inventory and approval policies. Sign in, upload and wait for ready status; verify actual vectors, collection identity, hybrid retrieval, cited passages and source inspector. Include answerable, absent, related-but-insufficient, contradictory, multi-passage and injection cases. For DO, inspect the proposal, reject one and approve a separate request, then check the ticket and audit record. Cross-workspace/requester and transaction-failure tests are mandatory regardless of the model.
-
-Three reproducible commands answer different questions:
-
-```bash
-# From backend, with the local profile active; run sequentially:
-python -m app.evaluate_grounding
-# Explicit model assessment of fixed passages, without retrieval/embedding evaluation:
-python -m app.evaluate_grounding --live
-# Full HTTP-handler/real-database/model pipeline on a NEW EMPTY dedicated DB:
-# Set DATABASE_URL privately to a database ending in _local or _eval first.
-python -m app.evaluate_local --live \
-  --output evals/local-live-results.json \
-  --credentials-file /tmp/mazmi-local-browser-credentials.json
-```
-
-The full evaluator requires development mode, demo disabled, both providers Ollama and an empty dedicated database. It refuses existing records **before migration**, preserves the resulting fictional database for inspection and never resets it. Re-running needs another new dedicated database. The optional credentials file must be new and outside Git; it is created with mode 0600 for later browser login. Do not publish, screenshot or paste it. The public JSON contains fixture metrics, not the password. A nonzero exit/result must remain visible rather than relabelling a partial run as passing.
-
-The full corpus contains four fictional policies and eight questions, with tool/approval/audit and workspace checks in addition to retrieval. Its per-document Recall@6/MRR, known-source selection, abstentions and stage durations describe only that corpus and model configuration. Review the returned quotations manually: exact citation IDs do not prove applicability. The separate `python -m app.evaluate` SQL evaluator uses synthetic vectors; it is not the same measurement. Historical reports remain in `backend/evals`; [VALIDATION.md](VALIDATION.md) distinguishes offline policy guards, raw real-model smoke and full live pipeline evidence, retaining all known failures.
-
-## Optional local voice
-
-Faster-Whisper/Piper are independent of chat and are not required for this release. When resources allow, explicitly install `backend/requirements-voice.txt` into the existing virtualenv and prepare licensed models outside Git. Configure an absolute local CTranslate2 directory with `STT_MODEL_PATH`, and Piper `.onnx` plus adjacent `.onnx.json` with `PIPER_MODEL_PATH`. STT uses `local_files_only=True`; the application does not download weights by model name. Verify the voice license and optional `PIPER_EXECUTABLE` yourself.
-
-Browser recording requires localhost or HTTPS, permission and a supported format. Limits remain 60 seconds and 10 MB. Denied permission or absent models must leave text chat usable. Real microphone/TTS remains unverified unless the dated report explicitly says otherwise. Compose does not include voice extras or model mounts; Docker Desktop was not started in this session. Never expose Ollama or PostgreSQL directly to the Internet.
-
-References: [Ollama chat](https://docs.ollama.com/api/chat), [embeddings](https://docs.ollama.com/api/embed), [tools](https://docs.ollama.com/capabilities/tool-calling), [structured outputs](https://docs.ollama.com/capabilities/structured-outputs), [EmbeddingGemma model card](https://huggingface.co/google/embeddinggemma-300m), [Faster-Whisper](https://github.com/SYSTRAN/faster-whisper), [Piper](https://github.com/OHF-Voice/piper1-gpl).
-
-
-## Stabilization results — 27 October 2026
-
-Exact unfiltered requests such as `Lista los últimos 3 tickets` or `Lista los tickets del workspace` now use the authenticated workspace directly, without generation or an API key. Other supported reads have at most one model decision and a deterministic database receipt. The numeric limit is validated (1–20), and a model cannot silently replace an explicit numeric count. Only ID/title/priority/status are returned. Additional filters are not implemented by the tool; interpreted results disclose that scope. Approval receipts also need no model call. Real samples were 22.21 ms / zero calls and 23.48 s / one call; these are not latency guarantees.
-
-The production RAG evaluator still uses native JSON Schema. A single bounded alternative removed native grammar while retaining the original semantic prompt, model, limits and strict backend validation. It passed two gold-only diagnostics, but the complete eight-question corpus produced three correct answers, three correct abstentions and two timeouts. It is **not enabled in the app**. Incomplete evaluations now display a verification-failure message instead of claiming the documentation lacks the answer.
-
-Reproduce fixed-passage checks with the existing local profile and an idle daemon:
-
-```bash
-# Native production path; no SQL/retrieval measured:
-python -m app.evaluate_grounding --live --dataset evals/recovery_holdout.json
-# Explicit diagnostic only; two public gold-passage cases:
-python -m app.diagnose_evidence --live --output evals/replayed-format-off.json
-```
-
-To reproduce the rejected full-pipeline candidate, first select a **new empty dedicated** `_local` or `_eval` database privately. This inserts fictional data and may take many minutes; do not point it at an existing application database. From `backend` with the Ollama profile active:
-
-```python
-import json
-from pathlib import Path
-from app import agent
-from app.diagnose_evidence import FormatOffDiagnostic
-from app.evaluate_local import run, fixture_checks_passed
-agent.client = FormatOffDiagnostic()  # This evaluator process only.
-report = run()
-report["generation_candidate"] = "diagnostic-native-format-off"
-report["automated_fixture_checks_passed"] = fixture_checks_passed(report)
-Path("evals/replayed-candidate.json").write_text(json.dumps(report, indent=2))
-```
-
-Keep native thinking (`think=null`), context 4096, evidence cap 2000, timeout 120 seconds and `keep_alive=0`. The installed preset advertises thinking `true` only. Generated-token counts include thinking; the adapter exposes safe numeric metrics and lengths, never private reasoning text. Observed throughput varied from 8.73 to 25.76 tokens/s; one supported implicit-reference assessment took 118.74 seconds. No token/context/timeout increase was validated.
-
-Keep virtualenvs, node_modules and PostgreSQL clusters **outside synchronized folders**. The first attempt hit filesystem read timeouts and a database connection timeout; the stable external runtime then completed 273 backend tests and the recorded real evaluations. Preserve source/results in the project, keep credentials/private database state outside Git, and follow [migration precautions](database/MIGRATIONS.md). No new migration or collection/reindexing change is required. [VALIDATION.md](VALIDATION.md) records the rejected candidate, native holdout, measured boundaries and release decision.
-
-## MAZMI 2.0: reasoning budget experiment — 9 November 2026
-
-Diagnosis: on this 8 GB M2, Qwen3 4B spends most of the 2,000-token evidence budget on its reasoning phase before writing the JSON decision, which produced incomplete assessments and ~120 s timeouts. Earlier `think=false` attempts were made without structured output and with greedy decoding. MAZMI 2.0 adds an opt-in `OLLAMA_REASONING=no_think_directive` that combines `think=false`, Qwen3's `/no_think` switch, the model's recommended non-thinking sampling and the native JSON schema.
-
-Controlled comparison on the same 8-case local corpus, same v2 pipeline, fresh databases, only this variable changed ([default](backend/evals/v2-local-model-default.json), [no_think](backend/evals/v2-local-no-think.json)):
-
-| Mode | Positives correct | Negatives correct | Unsupported answers | Timeouts / incomplete | Wall time |
-|---|---:|---:|---:|---:|---:|
-| `model_default` (default) | 2/4 | 4/4 | 0 | 1 / 1 | 777 s |
-| `no_think_directive` | 4/4 | 2/4 | **2** | 0 / 0 | 176 s |
-
-Without reasoning the model accepts passages that do not answer the question (delivery time, a person's name). An unsupported answer is worse than an abstention in an evidence system, so **the default is unchanged**. The option exists for measured experiments only. A future candidate is a quote-verified assessment schema (the model must return the exact supporting span, which the server verifies) evaluated on a held-out set.
+Docker Compose levanta PostgreSQL, backend y frontend, pero **Ollama sigue en el equipo anfitrión**: el backend lo alcanza en `http://host.docker.internal:11434`. En Linux, Ollama debe escuchar en una interfaz accesible desde el contenedor (`OLLAMA_HOST=0.0.0.0`) y conviene proteger el puerto con el cortafuegos. No es necesario Docker para ejecutar el modelo local.

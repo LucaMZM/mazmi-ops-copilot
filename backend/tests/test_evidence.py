@@ -4,7 +4,7 @@ from types import SimpleNamespace as NS
 
 import pytest
 
-from app.evaluate_grounding import evaluate, main
+from app.evaluate_grounding import evaluate
 from app.evidence import (
     ABSTENTION,
     ASSESSMENT_FAILURE,
@@ -18,10 +18,7 @@ CASES = json.loads((Path(__file__).parents[1] / "evals/grounding_cases.json").re
 
 @pytest.mark.parametrize(
     "case",
-    [
-        pytest.param(case, id=case["name"])
-        for case in CASES
-    ],
+    [pytest.param(case, id=case["name"]) for case in CASES],
 )
 def test_grounding_policy(case):
     def create(**kwargs):
@@ -58,8 +55,14 @@ def test_invalid_selections_fail_closed(payload):
         )
     )
     events = []
-    text, _, meta = documentary_answer(client, "Pregunta", [{"content": "Hecho"}], emit=events.append)
-    expected = ASSESSMENT_FAILURE if meta["abstention_reason"] == "invalid_evidence_assessment" else ABSTENTION
+    text, _, meta = documentary_answer(
+        client, "Pregunta", [{"content": "Hecho"}], emit=events.append
+    )
+    expected = (
+        ASSESSMENT_FAILURE
+        if meta["abstention_reason"] == "invalid_evidence_assessment"
+        else ABSTENTION
+    )
     assert text == expected and meta["citations"] == []
     assert [e["text"] for e in events if e["type"] == "delta"] == [expected]
 
@@ -138,29 +141,23 @@ def test_live_evaluation_does_not_leak_provider_errors_or_answers():
     assert "answer" not in report["cases"][0]
 
 
-def test_live_evaluation_refuses_cloud_or_demo(monkeypatch):
-    from app.config import settings
-
-    monkeypatch.setattr(settings, "generation_provider", "gemini")
-    monkeypatch.setattr("sys.argv", ["evaluate_grounding", "--live"])
-    with pytest.raises(SystemExit) as error:
-        main()
-    assert error.value.code == 2
-
-
 def test_unknown_evaluation_case_fails_instead_of_reporting_empty_success():
     with pytest.raises(ValueError, match="Unknown evaluation case"):
         evaluate(case_names=["nonexistent-case"])
 
 
-@pytest.mark.parametrize("premise", [
-    "", "No consta si el contrato contiene el anexo especial firmado.",
-    "Quizás el contrato contiene el anexo especial firmado.",
-    "¿El contrato contiene el anexo especial firmado?",
-    "El contrato contiene otro anexo especial firmado.",
-    "El contrato no contiene el anexo especial firmado.",
-    "El contrato contiene el anexo especial firmado.\n",
-])
+@pytest.mark.parametrize(
+    "premise",
+    [
+        "",
+        "No consta si el contrato contiene el anexo especial firmado.",
+        "Quizás el contrato contiene el anexo especial firmado.",
+        "¿El contrato contiene el anexo especial firmado?",
+        "El contrato contiene otro anexo especial firmado.",
+        "El contrato no contiene el anexo especial firmado.",
+        "El contrato contiene el anexo especial firmado.\n",
+    ],
+)
 def test_conditional_pay_requires_exact_asserted_premise_in_same_paragraph(premise):
     policy = "Si el contrato contiene el anexo especial firmado, el salario durante las vacaciones es de 2000 euros."
     assert unverified_pay_condition("¿Cuál es el salario durante las vacaciones?", premise + policy)
@@ -171,53 +168,78 @@ def test_exact_conditional_premise_only_allows_model_assessment():
     question = "¿Cuál es el salario durante las vacaciones?"
     assert not unverified_pay_condition(question, text)
     calls = []
+
     def create(**kwargs):
         calls.append(kwargs)
-        return NS(status="completed", output=[], output_text='{"status":"insufficient","passage_ids":[]}')
+        return NS(
+            status="completed", output=[], output_text='{"status":"insufficient","passage_ids":[]}'
+        )
+
     _, _, meta = documentary_answer(NS(responses=NS(create=create)), question, [{"content": text}])
     assert calls and meta["abstention_reason"] == "insufficient_evidence"
 
 
-@pytest.mark.parametrize("text", [
-    "Las vacaciones son 25 días.\nEn ese periodo el salario es de 2000 euros.",
-    "Las vacaciones son 25 días. El curso son 5 días. En ese periodo el salario es de 2000 euros.",
-    "Las vacaciones podrían ser 25 días. En ese periodo el salario es de 2000 euros.",
-    "Las vacaciones son 25 días y el curso son 5 días. En ese periodo el salario es de 2000 euros.",
-    "Las vacaciones son 25 días. En ese periodo el salario podría ser de 2000 euros.",
-])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Las vacaciones son 25 días.\nEn ese periodo el salario es de 2000 euros.",
+        "Las vacaciones son 25 días. El curso son 5 días. En ese periodo el salario es de 2000 euros.",
+        "Las vacaciones podrían ser 25 días. En ese periodo el salario es de 2000 euros.",
+        "Las vacaciones son 25 días y el curso son 5 días. En ese periodo el salario es de 2000 euros.",
+        "Las vacaciones son 25 días. En ese periodo el salario podría ser de 2000 euros.",
+    ],
+)
 def test_anaphora_guard_refuses_other_paragraphs_ambiguity_and_uncertainty(text):
     assert missing_fact_relation("¿Cuál es el salario durante las vacaciones?", text)
 
 
 def test_adjacent_anaphora_still_requires_sufficient_assessor():
-    client = NS(responses=NS(create=lambda **kw: NS(
-        status="completed", output=[], output_text='{"status":"insufficient","passage_ids":[]}'
-    )))
-    _, _, meta = documentary_answer(client, "¿Cuál es el salario durante las vacaciones?", [
-        {"content": "Las vacaciones son 25 días. En ese periodo el salario es de 2000 euros."}
-    ])
+    client = NS(
+        responses=NS(
+            create=lambda **kw: NS(
+                status="completed",
+                output=[],
+                output_text='{"status":"insufficient","passage_ids":[]}',
+            )
+        )
+    )
+    _, _, meta = documentary_answer(
+        client,
+        "¿Cuál es el salario durante las vacaciones?",
+        [{"content": "Las vacaciones son 25 días. En ese periodo el salario es de 2000 euros."}],
+    )
     assert meta["model_assessment_performed"]
     assert meta["abstention_reason"] == "insufficient_evidence"
 
 
 def test_incomplete_assessor_is_not_reported_as_missing_documentation():
-    client = NS(responses=NS(create=lambda **kw: NS(
-        status="incomplete", output=[], output_text=""
-    )))
+    client = NS(
+        responses=NS(create=lambda **kw: NS(status="incomplete", output=[], output_text=""))
+    )
     text, _, meta = documentary_answer(client, "Pregunta", [{"content": "Hecho"}])
     assert text == ASSESSMENT_FAILURE and text != ABSTENTION
     assert meta["abstention_reason"] == "incomplete_evidence_assessment"
 
 
-@pytest.mark.parametrize("name,ids", [
-    ("fabricated_passage", [1]), ("invented_assertion", [1]),
-    ("selected_subset_missing_salary", [2]), ("selected_subset_wrong_relation", [2]),
-])
+@pytest.mark.parametrize(
+    "name,ids",
+    [
+        ("fabricated_passage", [1]),
+        ("invented_assertion", [1]),
+        ("selected_subset_missing_salary", [2]),
+        ("selected_subset_wrong_relation", [2]),
+    ],
+)
 def test_live_gold_uses_source_semantics_and_preserves_mock_labels(name, ids):
-    client = NS(responses=NS(create=lambda **kw: NS(
-        status="completed", output=[],
-        output_text=json.dumps({"status":"sufficient", "passage_ids":ids})
-    )))
+    client = NS(
+        responses=NS(
+            create=lambda **kw: NS(
+                status="completed",
+                output=[],
+                output_text=json.dumps({"status": "sufficient", "passage_ids": ids}),
+            )
+        )
+    )
     report = evaluate(client=client, case_names=[name], include_answers=False)
     result = report["cases"][0]
     assert result["mock_expected_abstention"] is True
@@ -231,9 +253,10 @@ def test_live_gold_uses_source_semantics_and_preserves_mock_labels(name, ids):
 def test_failed_live_attempts_remain_in_answerability_denominators():
     def create(**kwargs):
         raise TimeoutError("private")
-    report = evaluate(client=NS(responses=NS(create=create)), case_names=[
-        "known_answer", "paraphrased_conflict"
-    ])
+
+    report = evaluate(
+        client=NS(responses=NS(create=create)), case_names=["known_answer", "paraphrased_conflict"]
+    )
     assert report["attempted_cases"] == 2 and report["completed_cases"] == 0
     assert report["answerable_cases"] == report["unanswerable_cases"] == 1
     assert report["answerable_provider_errors"] == report["unanswerable_provider_errors"] == 1
@@ -241,9 +264,9 @@ def test_failed_live_attempts_remain_in_answerability_denominators():
 
 
 def test_live_incomplete_assessor_does_not_count_as_correct_negative():
-    client = NS(responses=NS(create=lambda **kw: NS(
-        status="incomplete", output=[], output_text=""
-    )))
+    client = NS(
+        responses=NS(create=lambda **kw: NS(status="incomplete", output=[], output_text=""))
+    )
     report = evaluate(client=client, case_names=["paraphrased_conflict"])
     assert report["attempted_cases"] == 1 and report["assessment_failures"] == 1
     assert report["after_correct_abstentions"] == 0 and report["accuracy_all_attempts"] == 0
@@ -252,12 +275,17 @@ def test_live_incomplete_assessor_does_not_count_as_correct_negative():
 def test_native_format_diagnostic_preserves_budget_and_never_exports_text(tmp_path):
     from app.diagnose_evidence import FormatOffDiagnostic, diagnose
 
-    payload = FormatOffDiagnostic().payload({
-        "model": "qwen3:4b", "instructions": "base", "input": [],
-        "max_output_tokens": 2000, "text": {"format": {"schema": {"type": "object"}}},
-    })
+    payload = FormatOffDiagnostic().payload(
+        {
+            "model": "qwen3:4b",
+            "instructions": "base",
+            "input": [],
+            "max_output_tokens": 2000,
+            "text": {"format": {"schema": {"type": "object"}}},
+        }
+    )
     assert "format" not in payload and payload["think"] is None
-    assert payload["options"]["num_predict"] == 2000 and payload["keep_alive"] == 0
+    assert payload["options"]["num_predict"] == 2000 and payload["keep_alive"] == "5m"
     assert payload["messages"][0]["content"].startswith("base\n")
     calls = []
 

@@ -34,7 +34,6 @@ def api(monkeypatch):
         "database_url",
         make_conninfo(url, options=f"-c search_path={schema},public"),
     )
-    monkeypatch.setattr(settings, "openai_api_key", "test-placeholder")
     with psycopg.connect(settings.database_url) as conn:
         for path in sorted((Path(__file__).resolve().parents[2] / "database/init").glob("*.sql")):
             conn.execute(path.read_text())
@@ -412,7 +411,6 @@ def test_exact_ticket_read_is_scoped_limited_and_provider_independent(api, monke
             (other,),
         )
     monkeypatch.setattr(agent, "client", None)
-    monkeypatch.setattr(settings, "openai_api_key", "")
     result = api.post("/api/chat", json={"message": "Lista los últimos 3 tickets", "mode": "ASK"})
     assert result.status_code == 200, result.text
     body = result.json()
@@ -686,16 +684,13 @@ def test_migration_003_backfills_existing_rows_and_is_idempotent(api):
         )
 
 
-def test_local_pipeline_collections_and_atomic_reindex(api, monkeypatch):
+def test_local_pipeline_collections_and_atomic_reindex(api, monkeypatch, real_revision):
     import json
 
     import httpx
 
     from app.providers import Ollama
 
-    monkeypatch.setattr(settings, "generation_provider", "ollama")
-    monkeypatch.setattr(settings, "embedding_provider", "ollama")
-    monkeypatch.setattr(settings, "openai_api_key", "")
     revision = ["v1"]
     bad_vector = [False]
 
@@ -778,13 +773,11 @@ def test_local_pipeline_collections_and_atomic_reindex(api, monkeypatch):
 
 
 def test_mixed_provider_dimensions_never_enter_same_retrieval(api, monkeypatch):
-    old = api.post("/api/documents", files={"file": ("openai.txt", b"Policy exact ZXQ741")}).json()[
+    old = api.post("/api/documents", files={"file": ("wide.txt", b"Policy exact ZXQ741")}).json()[
         "id"
     ]
-    monkeypatch.setattr(settings, "embedding_provider", "ollama")
-    monkeypatch.setattr(
-        settings, "openai_api_key", ""
-    )  # Generation remains OpenAI; ingestion must be independent.
+    monkeypatch.setattr(settings, "embedding_dimensions", 768)
+    monkeypatch.setattr(rag, "embedding_revision", lambda: "local-v1")
     monkeypatch.setattr(
         rag,
         "client",
@@ -855,92 +848,5 @@ def test_migration_004_preserves_legacy_vectors(api):
         )
         assert (
             conn.execute("SELECT embedding_collection FROM document_chunks").fetchone()[0]
-            == "openai:text-embedding-3-small:1536:legacy"
-        )
-
-
-def test_gemini_pipeline_reindex_confirmation_and_quota(api, monkeypatch):
-    import json
-
-    import httpx
-
-    from app.gemini import Gemini
-
-    # First preserve a legacy OpenAI document, then explicitly migrate it.
-    doc = api.post(
-        "/api/documents", files={"file": ("policy.txt", b"Approval required for access.")}
-    )
-    assert doc.status_code == 200
-    docid = doc.json()["id"]
-    monkeypatch.setattr(settings, "generation_provider", "gemini")
-    monkeypatch.setattr(settings, "embedding_provider", "gemini")
-    monkeypatch.setattr(settings, "gemini_api_key", "mock-key")
-    monkeypatch.setattr(settings, "openai_api_key", "")
-    quota = [False]
-
-    def server(request):
-        if quota[0]:
-            return httpx.Response(429, json={"error": {"code": 429, "message": "SECRET"}})
-        body = json.loads(request.content)
-        if "requests" in body:
-            return httpx.Response(
-                200,
-                json={"embeddings": [{"values": [1.0] + [0.0] * 767} for _ in body["requests"]]},
-            )
-        parts = [{"text": '{"status":"sufficient","passage_ids":[1]}'}]
-        if body.get("tools"):
-            parts = [
-                {
-                    "functionCall": {
-                        "name": "create_ticket",
-                        "args": {
-                            "title": "Gemini",
-                            "description": "Petición explícita",
-                            "priority": "LOW",
-                        },
-                    },
-                    "thoughtSignature": "c2lnbmVk",
-                }
-            ]
-        result = {
-            "candidates": [{"content": {"role": "model", "parts": parts}, "finishReason": "STOP"}]
-        }
-        if "streamGenerateContent" in request.url.path:
-            return httpx.Response(
-                200,
-                headers={"content-type": "text/event-stream"},
-                text="data: " + json.dumps(result) + "\n\n",
-            )
-        return httpx.Response(200, json=result)
-
-    client = Gemini(httpx.MockTransport(server))
-    monkeypatch.setattr(rag, "client", client)
-    monkeypatch.setattr(agent, "client", client)
-    workspace = api.get("/api/auth/me").json()["workspace_id"]
-    with main.get_conn() as conn:
-        assert rag.retrieve(conn, workspace, "Approval") == []
-    assert api.post(f"/api/documents/{docid}/reindex").status_code == 200
-    with main.get_conn() as conn:
-        assert len(rag.retrieve(conn, workspace, "Approval")) == 1
-        assert rag.retrieve(conn, str(uuid4()), "Approval") == []
-    response = api.post("/api/chat", json={"message": "Explain access policy"})
-    assert response.status_code == 200 and "[1]" in response.json()["answer"]
-    proposed = api.post("/api/chat/stream", json={"message": "Crea un ticket", "mode": "DO"})
-    assert "pending_action" in proposed.text
-    assert api.get("/api/tickets").json() == []
-    with main.get_conn() as conn:
-        action = str(conn.execute("SELECT id FROM pending_actions").fetchone()[0])
-    assert api.post(f"/api/actions/{action}/decision", json={"approved": True}).status_code == 200
-    assert len(api.get("/api/tickets").json()) == 1
-    assert api.post(f"/api/actions/{action}/decision", json={"approved": True}).status_code == 409
-    quota[0] = True
-    response = api.post("/api/chat", json={"message": "Explain access policy"})
-    assert response.status_code == 429 and "SECRET" not in response.text
-    response = api.post("/api/chat/stream", json={"message": "Explain access policy"})
-    assert "429" in response.text and "SECRET" not in response.text
-    assert api.post(f"/api/documents/{docid}/reindex").status_code == 429
-    with main.get_conn() as conn:
-        assert (
-            conn.execute("SELECT vector_dims(embedding) FROM document_chunks").fetchone()[0] == 768
-        )
-    assert "document.reindexed" in [r["type"] for r in api.get("/api/activity").json()]
+            == "openai:embeddinggemma:1536:legacy"
+        )  # Historical backfill label of migration 004; existing data is preserved untouched.
