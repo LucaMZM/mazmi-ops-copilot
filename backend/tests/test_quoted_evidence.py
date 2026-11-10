@@ -341,3 +341,19 @@ def test_codes_and_years_still_have_to_exist_in_the_documents(question):
     from app.evidence import missing_scope
 
     assert missing_scope(question, "Política de teletrabajo 2025. Formulario TEL-01.")
+
+
+def test_an_article_after_a_qualifier_is_not_a_scope():
+    from app.evidence import missing_scope
+
+    content = "Está prohibido conectar memorias USB personales."
+    assert not missing_scope("¿Puedo usar mi memoria USB personal en el portátil?", content)
+    # A real qualifier is still required.
+    assert missing_scope("¿Qué dice la política para empleados en Valencia?", content)
+
+
+def test_superseded_passages_are_labelled_for_the_model_and_current_ones_are_not():
+    from app.evidence import passages
+
+    items = passages([{"content": "a"}, {"content": "b", "superseded": True}])
+    assert "estado" not in items[0] and items[1]["estado"] == "sustituido"
