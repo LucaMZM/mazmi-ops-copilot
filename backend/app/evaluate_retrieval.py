@@ -23,7 +23,9 @@ schemas and drops only those schemas. No documents leave the machine.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import re
 import statistics
 import time
 from contextlib import contextmanager
@@ -104,15 +106,24 @@ def isolated_schema(base_url: str):
             admin.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))
 
 
-def synthetic_client():
-    from .demo import vector
+def hashed_vector(text, dimensions):
+    """Deterministic bag-of-words vector: SQL/plumbing evidence only, never semantic."""
+    values = [0.0] * dimensions
+    for word in re.findall(r"[\w-]+", text.lower()):
+        values[int(hashlib.sha256(word.encode()).hexdigest()[:8], 16) % dimensions] += 1
+    return values
 
+
+def synthetic_client():
     return NS(
+        digest=lambda model: "synthetic-hash",
         embeddings=NS(
             create=lambda *, model, input, dimensions: NS(
-                data=[NS(index=i, embedding=vector(t, dimensions)) for i, t in enumerate(input)]
+                data=[
+                    NS(index=i, embedding=hashed_vector(t, dimensions)) for i, t in enumerate(input)
+                ]
             )
-        )
+        ),
     )
 
 
@@ -120,12 +131,8 @@ def run(embeddings: str) -> dict:
     database = conninfo_to_dict(settings.database_url).get("dbname", "")
     if not database.endswith("_eval"):
         raise ValueError("Requires a dedicated database ending in _eval")
-    if embeddings == "ollama" and (settings.embedding_provider != "ollama" or settings.demo_mode):
-        raise ValueError("--embeddings ollama requires EMBEDDING_PROVIDER=ollama")
     if embeddings == "synthetic":
-        rag.client = synthetic_client()
-        settings.embedding_provider = "openai"  # Label only; never contacted.
-        settings.embedding_revision = "synthetic-hash"
+        rag.client = synthetic_client()  # Collection identity carries "synthetic-hash".
     corpus = json.loads((EVALS / "v2_retrieval_corpus.json").read_text())
     base_url = settings.database_url
     collection = rag.embedding_collection()

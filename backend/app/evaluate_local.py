@@ -22,6 +22,8 @@ import psycopg
 from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict
 
+from .evidence import plain_text
+
 EVALS = Path(__file__).resolve().parents[1] / "evals"
 REPO = Path(__file__).resolve().parents[2]
 
@@ -58,13 +60,8 @@ class EvaluationRequestError(RuntimeError):
 
 
 def guard_configuration(settings):
-    if (
-        settings.app_env != "development"
-        or settings.demo_mode
-        or settings.generation_provider != "ollama"
-        or settings.embedding_provider != "ollama"
-    ):
-        raise ValueError("Requires development, DEMO_MODE=false and both providers=ollama")
+    if settings.app_env != "development":
+        raise ValueError("Requires APP_ENV=development")
     database = conninfo_to_dict(settings.database_url).get("dbname", "")
     if not database.endswith(("_eval", "_local")):
         raise ValueError("Requires a dedicated database ending in _eval or _local")
@@ -120,13 +117,14 @@ def literal_quotes(answer, contents):
     """Every «quoted» span must be a literal substring of the source it cites.
 
     ``contents`` maps citation number -> stored chunk text. Omission marks (…) split a
-    quote into separately verified pieces; whitespace runs are compared collapsed.
-    Returns (quote_count, all_verified).
+    quote into separately verified pieces. Whitespace runs are compared collapsed and the
+    markdown list/heading/table-rule syntax that the extractive renderer drops is removed
+    from the source; case and accents must match exactly. Returns (quote_count, all_verified).
     """
     count, verified = 0, True
     for quoted, ref in QUOTE.findall(answer):
         count += 1
-        source = " ".join(contents.get(int(ref), "").split())
+        source = " ".join(plain_text(contents.get(int(ref), "")).split())
         quoted = re.sub(r"〔(\d+)〕", r"[\1]", quoted)
         for piece in (p.strip() for p in quoted.split("…")):
             if piece and " ".join(piece.split()) not in source:
@@ -461,6 +459,8 @@ def run(*, credentials_file=None, cases_path=None):
                         "abstained": bool(meta.get("abstention_reason")),
                         "abstention_reason": meta.get("abstention_reason"),
                         "evidence_policy": meta.get("evidence_policy"),
+                        "assessment": meta.get("assessment", {}),
+                        "model_calls": meta.get("model_calls", 0),
                         "input_tokens": meta.get("input_tokens", 0),
                         "output_tokens": meta.get("output_tokens", 0),
                         "provider_metrics": meta.get("provider_metrics", {}),

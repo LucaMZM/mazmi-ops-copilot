@@ -4,7 +4,7 @@ from types import SimpleNamespace as NS
 import httpx
 import pytest
 
-from app import providers, rag
+from app import rag
 from app.config import Settings, settings
 from app.providers import Ollama, ProviderUnavailable
 
@@ -49,7 +49,7 @@ def test_native_schema_and_tool_result_translation():
         tools=[],
     )
     assert response.status == "completed"
-    assert seen[0]["format"] == {"type": "object"} and seen[0]["think"] is None
+    assert seen[0]["format"] == {"type": "object"} and seen[0]["think"] is None  # reasoning on
     assert seen[0]["messages"][-1] == {"role": "tool", "tool_name": "get_tickets", "content": "[]"}
 
 
@@ -119,8 +119,8 @@ def test_provider_errors_do_not_leak_body():
     assert "secret" not in str(exc.value)
 
 
-def test_embedding_prefix_dimensions_and_identity(monkeypatch):
-    monkeypatch.setattr(settings, "embedding_provider", "ollama")
+def test_embedding_prefix_dimensions_and_identity(monkeypatch, real_revision):
+    monkeypatch.setattr(settings, "embedding_dimensions", 768)
     seen = []
 
     def server(req):
@@ -154,18 +154,8 @@ def test_invalid_embedding_vectors_rejected(monkeypatch, vector):
         rag.embed_texts(["text"])
 
 
-def test_openai_remains_optional(monkeypatch):
-    monkeypatch.setattr(settings, "generation_provider", "openai")
-    monkeypatch.setattr(settings, "openai_api_key", "")
-    with pytest.raises(ProviderUnavailable):
-        _ = providers.generation_client().responses
-    monkeypatch.setattr(settings, "openai_api_key", "test-key-not-real")
-    monkeypatch.setattr(providers, "OpenAI", lambda **kw: NS(responses="openai-adapter"))
-    assert providers.generation_client().responses == "openai-adapter"
-
-
-def test_model_digest_change_during_embedding_is_rejected(monkeypatch):
-    monkeypatch.setattr(settings, "embedding_provider", "ollama")
+def test_model_digest_change_during_embedding_is_rejected(monkeypatch, real_revision):
+    monkeypatch.setattr(settings, "embedding_dimensions", 768)
     revisions = iter(["before", "after"])
     monkeypatch.setattr(
         rag,
@@ -258,8 +248,12 @@ def test_local_context_is_configured_and_models_unload(monkeypatch):
     monkeypatch.setattr(settings, "ollama_num_ctx", 4096)
     payload = Ollama().payload({"model": "qwen3:4b", "input": []})
     assert payload["options"]["num_ctx"] == 4096
-    assert payload["keep_alive"] == 0 and payload["think"] is None
+    assert payload["keep_alive"] == settings.ollama_keep_alive == "5m"
+    assert payload["think"] is None  # reasoning "on" is the model's own behaviour
     assert "temperature" not in payload["options"] and payload["options"]["seed"] == 42
+    assert Ollama().payload({"model": "qwen3:4b", "input": [], "seed": 43})["options"]["seed"] == 43
+    monkeypatch.setattr(settings, "ollama_keep_alive", "0")
+    assert Ollama().payload({"model": "qwen3:4b", "input": []})["keep_alive"] == "0"
 
 
 def test_local_thinking_is_not_exposed_in_completed_or_streamed_text():
@@ -298,15 +292,25 @@ def test_local_stream_rejects_non_object_messages(message):
 
 def test_native_metrics_are_allowlisted_and_reject_invalid_values():
     data = {
-        "done": True, "done_reason": "length", "prompt_eval_count": 530,
-        "eval_count": 2000, "load_duration": 12, "eval_duration": 24,
-        "total_duration": -1, "prompt_eval_duration": True,
-        "private_detail": "secret", "message": {"thinking": "private-thought", "content": ""},
+        "done": True,
+        "done_reason": "length",
+        "prompt_eval_count": 530,
+        "eval_count": 2000,
+        "load_duration": 12,
+        "eval_duration": 24,
+        "total_duration": -1,
+        "prompt_eval_duration": True,
+        "private_detail": "secret",
+        "message": {"thinking": "private-thought", "content": ""},
     }
     result = Ollama().result(data)
     assert result.provider_metrics == {
-        "prompt_eval_count": 530, "eval_count": 2000, "load_duration": 12,
-        "eval_duration": 24, "done_reason": "length", "content_chars": 0,
+        "prompt_eval_count": 530,
+        "eval_count": 2000,
+        "load_duration": 12,
+        "eval_duration": 24,
+        "done_reason": "length",
+        "content_chars": 0,
         "thinking_chars": len("private-thought"),
     }
     assert "private" not in str(vars(result)) and "secret" not in str(vars(result))
@@ -319,9 +323,11 @@ def test_streamed_thinking_metrics_count_lengths_without_emitting_text():
         {"message": {"thinking": "secret"}, "done": False},
         {"message": {"thinking": "thought", "content": "{}"}, "done": True, "done_reason": "stop"},
     ]
-    client = Ollama(httpx.MockTransport(lambda r: httpx.Response(
-        200, text="\n".join(json.dumps(f) for f in frames)
-    )))
+    client = Ollama(
+        httpx.MockTransport(
+            lambda r: httpx.Response(200, text="\n".join(json.dumps(f) for f in frames))
+        )
+    )
     with client.create(model="qwen3:4b", input=[], stream=True) as stream:
         events = list(stream)
     assert events[-1].response.provider_metrics["thinking_chars"] == 13
@@ -329,10 +335,7 @@ def test_streamed_thinking_metrics_count_lengths_without_emitting_text():
     assert "secret" not in str(events) and "thought" not in str(events)
 
 
-def test_no_think_directive_is_opt_in_and_never_greedy(monkeypatch):
-    from app.config import settings
-    from app.providers import Ollama
-
+def test_reasoning_off_disables_thinking_and_is_never_greedy(monkeypatch):
     kwargs = {
         "model": "qwen3:4b",
         "instructions": "Evalúa.",
@@ -341,7 +344,7 @@ def test_no_think_directive_is_opt_in_and_never_greedy(monkeypatch):
     }
     default = Ollama().payload(kwargs)
     assert default["think"] is None and "temperature" not in default["options"]
-    monkeypatch.setattr(settings, "ollama_reasoning", "no_think_directive")
+    monkeypatch.setattr(settings, "ollama_reasoning", "off")
     payload = Ollama().payload(kwargs)
     assert payload["think"] is False
     assert payload["messages"][0]["content"].endswith("/no_think")

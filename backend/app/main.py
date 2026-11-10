@@ -30,7 +30,6 @@ import psycopg
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from openai import OpenAIError
 from pydantic import ValidationError
 from starlette.concurrency import run_in_threadpool
 
@@ -51,7 +50,7 @@ from .conversations import router as conversations_router
 from .db import DatabaseBusy, close_pool, get_conn
 from .documents import recover_interrupted_indexing
 from .documents import router as documents_router
-from .errors import provider_error, require_provider
+from .errors import provider_error
 from .rag import prepare_query, retrieve
 from .schemas import (
     ActionDecision,
@@ -155,9 +154,8 @@ def health():
     return {
         "status": "ok",
         "version": app.version,
-        "openai_configured": bool(settings.openai_api_key),
-        "generation_provider": "demo" if settings.demo_mode else settings.generation_provider,
-        "embedding_provider": "demo" if settings.demo_mode else settings.embedding_provider,
+        "generation_provider": settings.generation_provider,
+        "embedding_provider": settings.embedding_provider,
     }
 
 
@@ -245,9 +243,9 @@ def generation_slot(emit: Callable | None, cancelled: Event | None):
 def preflight_chat(payload: ChatRequest) -> bool:
     """Validate a turn before any write or stream: returns True for model-free reads.
 
-    Exact, unfiltered ticket reads are answered from the database with zero model
-    calls, so they must not depend on a configured provider. Every other turn needs
-    the generation provider (and, for documentary questions, embeddings).
+    Exact, unfiltered ticket reads are answered from the database with zero model calls.
+    Every other turn reaches the local Ollama server; an unreachable server or missing
+    model is reported as a sanitized 503 by the provider adapter.
     """
     try:
         tools = requested_tools(payload.message, payload.mode)
@@ -257,10 +255,6 @@ def preflight_chat(payload: ChatRequest) -> bool:
         )
     except TicketQueryError as exc:
         raise HTTPException(400, str(exc)) from exc
-    if not direct_read:
-        require_provider()
-        if not tools:
-            require_provider("embedding")
     return direct_read
 
 
@@ -556,7 +550,7 @@ def run_chat(
     pending = validate_pending(pending, payload)
     meta.update(
         {
-            "generation_provider": "demo" if settings.demo_mode else settings.generation_provider,
+            "generation_provider": settings.generation_provider,
             "retrieval_ms": retrieval_ms,
             "retrieval": retrieval_meta,
             "retrieved_chunks": len(sources),
@@ -699,7 +693,7 @@ def decide_action(action_id: UUID, payload: ActionDecision, user: CurrentUser):
     # never roll back a confirmed action or cause a second execution.
     try:
         result["summary"] = describe_execution(action_name, args, result)
-    except (OpenAIError, RuntimeError, ValueError):
+    except (RuntimeError, ValueError):
         result["summary"] = f"Ticket #{ticket[0]} creado tras tu confirmación."
     return result
 

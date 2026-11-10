@@ -2,7 +2,8 @@
 
 DATABASE_URL=... python -m app.evaluate [--live]
 Offline vectors deliberately collapse similar procedures: this is a deterministic
-regression benchmark, not an estimate of OpenAI semantic quality.
+regression benchmark, not an estimate of semantic quality. --live uses the configured
+local Ollama embedding model.
 """
 
 import argparse
@@ -49,17 +50,15 @@ def baseline(conn, workspace, query):
 
 
 def evaluate(live=False):
-    if live and settings.embedding_provider == "openai" and not settings.openai_api_key:
-        raise RuntimeError("--live requiere OPENAI_API_KEY")
     dataset = json.loads((Path(__file__).resolve().parents[1] / "evals/cases.json").read_text())
     original = rag.client
-    original_provider, original_dimensions = (
-        settings.embedding_provider,
-        settings.embedding_dimensions,
-    )
+    original_dimensions = settings.embedding_dimensions
     if not live:
-        settings.embedding_provider, settings.embedding_dimensions = "openai", 1536
-        rag.client = SimpleNamespace(embeddings=SimpleNamespace(create=offline_embeddings))
+        settings.embedding_dimensions = 1536
+        rag.client = SimpleNamespace(
+            digest=lambda model: "offline-fixture",
+            embeddings=SimpleNamespace(create=offline_embeddings),
+        )
     results = {"before_vector": [], "after_hybrid": []}
     try:
         with psycopg.connect(settings.database_url) as conn:
@@ -119,10 +118,7 @@ def evaluate(live=False):
                 conn.rollback()
     finally:
         rag.client = original
-        settings.embedding_provider, settings.embedding_dimensions = (
-            original_provider,
-            original_dimensions,
-        )
+        settings.embedding_dimensions = original_dimensions
     report = {
         "mode": "live-embeddings" if live else "deterministic-embeddings",
         "k": 6,
