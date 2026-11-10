@@ -59,9 +59,17 @@ docx_table(
     manual,
     [
         ["Motivo", "Duración", "Justificante"],
-        ["Matrimonio o pareja de hecho", "15 días naturales", "Certificado de matrimonio o inscripción"],
+        [
+            "Matrimonio o pareja de hecho",
+            "15 días naturales",
+            "Certificado de matrimonio o inscripción",
+        ],
         ["Nacimiento o adopción de un hijo", "5 días laborables", "Libro de familia o certificado"],
-        ["Fallecimiento de cónyuge, padres o hijos", "5 días laborables", "Certificado de defunción"],
+        [
+            "Fallecimiento de cónyuge, padres o hijos",
+            "5 días laborables",
+            "Certificado de defunción",
+        ],
         ["Fallecimiento de abuelos o hermanos", "3 días laborables", "Certificado de defunción"],
         ["Mudanza del domicilio habitual", "1 día laborable", "Certificado de empadronamiento"],
         ["Exámenes oficiales", "El tiempo necesario", "Justificante del centro"],
@@ -94,9 +102,19 @@ docx_table(
     ti,
     [
         ["Prioridad", "Descripción", "Respuesta", "Resolución objetivo"],
-        ["P1 Crítica", "Caída total del almacén o del sistema de expediciones", "1 hora", "4 horas"],
+        [
+            "P1 Crítica",
+            "Caída total del almacén o del sistema de expediciones",
+            "1 hora",
+            "4 horas",
+        ],
         ["P2 Alta", "Un equipo o departamento no puede trabajar", "4 horas", "1 día laborable"],
-        ["P3 Media", "Problema con una alternativa disponible", "1 día laborable", "3 días laborables"],
+        [
+            "P3 Media",
+            "Problema con una alternativa disponible",
+            "1 día laborable",
+            "3 días laborables",
+        ],
         ["P4 Baja", "Peticiones y mejoras", "3 días laborables", "10 días laborables"],
     ],
 )
@@ -244,22 +262,37 @@ gastos.para(
 )
 gastos.sec("2. Alojamiento: límite por noche")
 gastos.tbl(
-    [["Destino", "Límite por noche"], ["Madrid y Barcelona", "120 euros"], ["Resto de España", "90 euros"],
-     ["Europa", "150 euros"], ["Fuera de Europa", "200 euros"]],
+    [
+        ["Destino", "Límite por noche"],
+        ["Madrid y Barcelona", "120 euros"],
+        ["Resto de España", "90 euros"],
+        ["Europa", "150 euros"],
+        ["Fuera de Europa", "200 euros"],
+    ],
     (60, 40),
 )
 gastos.sec("3. Dietas")
 gastos.tbl(
-    [["Concepto", "Importe"], ["Media dieta en España (comida o cena)", "18 euros"],
-     ["Dieta completa en España", "42 euros"], ["Dieta completa en el extranjero", "60 euros"]],
+    [
+        ["Concepto", "Importe"],
+        ["Media dieta en España (comida o cena)", "18 euros"],
+        ["Dieta completa en España", "42 euros"],
+        ["Dieta completa en el extranjero", "60 euros"],
+    ],
     (80, 30),
 )
 gastos.sec("4. Vehículo propio")
-gastos.para("Se abonan 0,26 euros por kilómetro. Los peajes y el aparcamiento se justifican con ticket.")
+gastos.para(
+    "Se abonan 0,26 euros por kilómetro. Los peajes y el aparcamiento se justifican con ticket."
+)
 gastos.sec("5. Aprobación de gastos")
 gastos.tbl(
-    [["Importe del gasto", "Quién aprueba"], ["Hasta 300 euros", "La persona responsable directa"],
-     ["Más de 300 y hasta 1.500 euros", "Finanzas"], ["Más de 1.500 euros", "Dirección general"]],
+    [
+        ["Importe del gasto", "Quién aprueba"],
+        ["Hasta 300 euros", "La persona responsable directa"],
+        ["Más de 300 y hasta 1.500 euros", "Finanzas"],
+        ["Más de 1.500 euros", "Dirección general"],
+    ],
     (70, 70),
 )
 gastos.sec("6. Viajes en avión")
@@ -283,7 +316,9 @@ tele23.para("La empresa abona 20 euros al mes. La solicitud se tramita con el fo
 tele23.output(str(OUT / "politica-teletrabajo-2023.pdf"))
 
 contrato = Pdf()
-contrato.title_("Contrato de transporte entre Aurelia Logística S.L. y Transportes Rápido Norte S.A.")
+contrato.title_(
+    "Contrato de transporte entre Aurelia Logística S.L. y Transportes Rápido Norte S.A."
+)
 contrato.sec("Cláusula 1. Vigencia")
 contrato.para(
     "El contrato tiene una vigencia de 24 meses desde el 1 de marzo de 2025 y se prorroga por "
@@ -291,8 +326,12 @@ contrato.para(
 )
 contrato.sec("Cláusula 2. Plazos de entrega")
 contrato.tbl(
-    [["Destino", "Plazo de entrega"], ["Península", "48 horas desde la recogida"], ["Baleares", "72 horas desde la recogida"],
-     ["Canarias", "5 días laborables"]],
+    [
+        ["Destino", "Plazo de entrega"],
+        ["Península", "48 horas desde la recogida"],
+        ["Baleares", "72 horas desde la recogida"],
+        ["Canarias", "5 días laborables"],
+    ],
     (60, 70),
 )
 contrato.sec("Cláusula 3. Penalizaciones")
@@ -301,7 +340,9 @@ contrato.para(
     "del servicio, con un máximo del 10 % del importe."
 )
 contrato.sec("Cláusula 4. Seguro")
-contrato.para("El transportista mantiene un seguro de responsabilidad civil de 100.000 euros por siniestro.")
+contrato.para(
+    "El transportista mantiene un seguro de responsabilidad civil de 100.000 euros por siniestro."
+)
 contrato.sec("Cláusula 5. Tarifa")
 contrato.para("La tarifa es de 4,80 euros por bulto de hasta 30 kg en la península.")
 contrato.sec("Cláusula 6. Resolución")

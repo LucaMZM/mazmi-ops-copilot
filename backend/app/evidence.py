@@ -89,6 +89,22 @@ def passages(sources):
     ]
 
 
+def is_identifier(word):
+    """Codes (INC-17, TEL-01), alphanumerics and years name a scope that must exist in the text.
+
+    A plain amount in a question ("un gasto de 800 euros", "2.000") is an input to the
+    policy, not something the document must repeat: requiring it made every "who approves
+    X euros?" question abstain.
+    """
+    if not any(c.isdigit() for c in word):
+        return False
+    return (
+        bool(re.search(r"[^\W\d_]", word))
+        or "-" in word
+        or bool(re.fullmatch(r"(?:19|20)\d\d", word))
+    )
+
+
 def missing_scope(question, content):
     """Guard explicit proper names, quoted scopes, identifiers and local qualifiers.
 
@@ -116,7 +132,7 @@ def missing_scope(question, content):
     required = [
         w
         for i, w in enumerate(words)
-        if (i > 0 and w[0].isupper() and normalize(w) not in ignored) or any(c.isdigit() for c in w)
+        if (i > 0 and w[0].isupper() and normalize(w) not in ignored) or is_identifier(w)
     ]
     required += re.findall(r'["“]([^"”]+)["”]', question)
     required += re.findall(
@@ -130,15 +146,30 @@ def missing_scope(question, content):
     )
 
 
-def has_literal_conflict(items):
+def relevant_sentence(question_terms, sentence):
+    """A sentence takes part in a conflict only if it shares at least half of the question's terms.
+
+    Without this, two unrelated documents that happen to use the same template (an old and a
+    new policy about another topic) block every question whose retrieval touched both.
+    """
+    if not question_terms:
+        return True
+    needed = max(1, -(-len(question_terms) // 2))  # ceil(n / 2)
+    return len(question_terms & _terms(sentence)) >= needed
+
+
+def has_literal_conflict(items, question=None):
     """Same sentence template with different numbers or negation => abstain.
 
     All retrieved chunks checked, not just the model's preferred subset. Does not
     resolve versions/authority or detect arbitrary paraphrased contradictions.
     """
     seen = {}
+    question_terms = _terms(question) if question else set()
     for item in items:
         for sentence in re.split(r"(?<=[.!?])\s+", item["text"]):
+            if question and not relevant_sentence(question_terms, sentence):
+                continue
             value = normalize(sentence).rstrip(".!?")
             numbers = tuple(re.findall(r"\b\d+(?:[.,]\d+)?\b", value))
             negative = bool(re.search(r"\b(no|not|nunca|never)\b", value))
@@ -380,16 +411,41 @@ def _origin(source):
     name = source.get("filename")
     # The two innermost headings identify the passage without repeating the title.
     section = " › ".join((source.get("section") or "").split(" › ")[-2:]) or None
+    note = " [documento marcado como sustituido]" if source.get("superseded") else ""
     if name and section:
-        return f"Según {name} ({section})"
+        return f"Según {name} ({section}){note}"
     if name:
-        return f"Según {name}"
+        return f"Según {name}{note}"
     return "Según la documentación"
+
+
+HISTORIC = re.compile(
+    r"\b(antigu\w*|anterior(?:es)?|historic\w*|obsolet\w*|sustituid\w*|derogad\w*|antes|"
+    r"version\s+de\s+(?:19|20)\d\d|(?:politica|normativa|manual|contrato)\s+de\s+(?:19|20)\d\d|"
+    r"en\s+(?:19|20)\d\d)\b"
+)
+
+
+def visible_passages(question, items, sources):
+    """Passages that may answer: documents marked as superseded are ignored unless asked for.
+
+    A policy that says it was replaced by another version must not be quoted as current
+    ("¿cuántos días de teletrabajo?" answered with last year's rule). A question that
+    explicitly looks backwards (a year, "antigua", "anterior") keeps them. If every
+    retrieved passage is superseded they are kept and flagged in the answer instead of
+    pretending that nothing exists.
+    """
+    stale = {p["id"] for p in items if sources[p["id"] - 1].get("superseded")}
+    if not stale or HISTORIC.search(normalize(question)):
+        return items, set()
+    current = [p for p in items if p["id"] not in stale]
+    return (current, stale) if current else (items, set())
 
 
 def documentary_answer(client, question, sources, history=None, emit=None):
     started = time.perf_counter()
-    items = passages(sources)
+    items = passages(sources)  # Full list: ids are the citation numbers shown to the user.
+    visible, ignored = visible_passages(question, items, sources)
     focused = settings.answer_style == "focused_v5"
     meta = {
         "model": settings.generation_model,
@@ -401,6 +457,7 @@ def documentary_answer(client, question, sources, history=None, emit=None):
         "model_assessment_performed": False,
         "selected_passage_ids": [],
         "assessment": {},
+        "superseded_ignored": sorted(ignored),
         "abstention_reason": None,
     }
 
@@ -444,23 +501,33 @@ def documentary_answer(client, question, sources, history=None, emit=None):
             emit({"type": "delta", "text": text})
         return text, None, meta
 
-    if not items:
+    if not visible:
         return finish("no_retrieval_evidence")
-    if missing_scope(question, "\n".join(p["text"] for p in items)):
+    joined = "\n".join(p["text"] for p in visible)
+    if missing_scope(question, joined):
         return finish("missing_question_scope")
-    if missing_fact_facet(question, "\n".join(p["text"] for p in items)):
+    if missing_fact_facet(question, joined):
         return finish("missing_fact_facet")
-    if missing_fact_relation(question, "\n".join(p["text"] for p in items)):
+    if missing_fact_relation(question, joined):
         return finish("missing_fact_relation")
-    if unverified_pay_condition(question, "\n".join(p["text"] for p in items)):
+    if unverified_pay_condition(question, joined):
         return finish("unverified_pay_condition")
-    if has_literal_conflict(items):
+    # Two versions of a policy are not a contradiction: conflicts are looked for within the
+    # current documents and within the superseded ones, never across the two groups.
+    stale_ids = {p["id"] for p in visible if sources[p["id"] - 1].get("superseded")}
+    groups = (
+        [p for p in visible if p["id"] not in stale_ids],
+        [p for p in visible if p["id"] in stale_ids],
+    )
+    if any(has_literal_conflict(group, question) for group in groups):
         return finish("conflicting_evidence")
     if emit:
         emit({"type": "status", "text": "Comprobando suficiencia de la evidencia…"})
     meta["model_assessment_performed"] = True
     if settings.evidence_mode == "quoted_v6":
-        return _quoted_assessment(client, question, history, items, meta, finish, emit, sources)
+        return _quoted_assessment(
+            client, question, history, items, visible, meta, finish, emit, sources
+        )
     response = client.responses.create(
         model=settings.generation_model,
         store=False,
@@ -482,7 +549,7 @@ def documentary_answer(client, question, sources, history=None, emit=None):
             {
                 "role": "user",
                 "content": json.dumps(
-                    {"question": question, "history": history or [], "passages": items},
+                    {"question": question, "history": history or [], "passages": visible},
                     ensure_ascii=False,
                 ),
             }
@@ -516,7 +583,8 @@ def documentary_answer(client, question, sources, history=None, emit=None):
             "conflicting_evidence" if decision.status == "conflicting" else "insufficient_evidence"
         )
     ids = decision.passage_ids
-    if not ids or len(ids) != len(set(ids)) or any(i < 1 or i > len(items) for i in ids):
+    allowed = {p["id"] for p in visible}
+    if not ids or len(ids) != len(set(ids)) or any(i not in allowed for i in ids):
         return finish("invalid_evidence_selection")
     selected = [items[i - 1] for i in ids]
     if missing_scope(question, "\n".join(p["text"] for p in selected)):
@@ -631,7 +699,7 @@ def _json_call(client, meta, instructions, content, model_cls, name, seed=42):
         return None, "invalid_evidence_assessment"
 
 
-def _quoted_assessment(client, question, history, items, meta, finish, emit, sources):
+def _quoted_assessment(client, question, history, items, visible, meta, finish, emit, sources):
     """Quote-verified sufficiency: the model must copy literal evidence, the server checks it.
 
     1. The model decides sufficiency and copies one literal quote per question part.
@@ -641,7 +709,8 @@ def _quoted_assessment(client, question, history, items, meta, finish, emit, sou
     Deterministic scope/facet/conflict/instruction guards run before and after.
     """
     meta["evidence_policy"] = "quoted_v6"
-    request = {"question": question, "history": history or [], "passages": items}
+    request = {"question": question, "history": history or [], "passages": visible}
+    allowed = {p["id"] for p in visible}
     for attempt in (1, 2):
         decision, reason = _json_call(
             client,
@@ -670,7 +739,7 @@ def _quoted_assessment(client, question, history, items, meta, finish, emit, sou
             return finish("invalid_evidence_selection")
         quotes = {}
         for item in decision.evidence:
-            if not 1 <= item.passage_id <= len(items):
+            if item.passage_id not in allowed:
                 return finish("invalid_evidence_selection")
             passage = items[item.passage_id - 1]["text"]
             quote = item.quote if verify_quote(item.quote, passage) else None

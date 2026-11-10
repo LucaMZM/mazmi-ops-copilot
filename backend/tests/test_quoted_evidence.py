@@ -257,3 +257,87 @@ def test_snapped_quote_is_what_the_check_and_the_user_receive():
     assert "a las 09:00." in text and "09:0.0" not in text
     sent = json.loads(calls[1]["input"][0]["content"])
     assert sent["quotes"][0]["quote"] == "El recuento del almacén Norte se hace a las 09:00."
+
+
+# ---- real-world corpus regressions (found with the realistic Aurelia evaluation)
+
+OLD = "Política de teletrabajo 2023. Se permite teletrabajar hasta 3 días por semana."
+NEW = "Política de teletrabajo 2025. Se permite teletrabajar hasta 2 días por semana."
+VAC = "Cada persona dispone de 23 días laborables de vacaciones al año."
+
+
+def test_unrelated_documents_with_the_same_template_do_not_block_a_question():
+    from app.evidence import has_literal_conflict, passages
+
+    items = passages([{"content": VAC}, {"content": NEW}, {"content": OLD}])
+    assert has_literal_conflict(items)  # Unscoped, the two teleworking versions conflict.
+    assert not has_literal_conflict(items, "¿Cuántos días de vacaciones tengo al año?")
+    assert has_literal_conflict(items, "¿Cuántos días de teletrabajo puedo hacer?")
+
+
+def test_superseded_documents_are_not_offered_to_the_model_unless_asked_for():
+    sources = [
+        {"content": NEW, "filename": "tele-2025.md"},
+        {"content": OLD, "filename": "tele-2023.pdf", "superseded": True},
+    ]
+    client, calls = scripted(selection("Se permite teletrabajar hasta 2 días por semana."), YES)
+    text, _, meta = documentary_answer(client, "¿Cuántos días de teletrabajo puedo hacer?", sources)
+    assert meta["abstention_reason"] is None and meta["superseded_ignored"] == [2]
+    assert "2 días" in text and "3 días" not in text
+    sent = json.loads(calls[0]["input"][0]["content"])
+    assert [p["id"] for p in sent["passages"]] == [1]
+    # The model cannot reach the ignored passage by naming its id either.
+    client, _ = scripted(
+        selection("Se permite teletrabajar hasta 3 días por semana.", passage_id=2), YES
+    )
+    _, _, meta = documentary_answer(client, "¿Cuántos días de teletrabajo puedo hacer?", sources)
+    assert meta["abstention_reason"] == "invalid_evidence_selection"
+
+
+def test_a_question_about_the_old_version_keeps_the_superseded_document():
+    sources = [
+        {"content": NEW, "filename": "tele-2025.md"},
+        {"content": OLD, "filename": "tele-2023.pdf", "superseded": True},
+    ]
+    client, calls = scripted(selection("Se permite teletrabajar hasta 3 días por semana.", 2), YES)
+    text, _, meta = documentary_answer(
+        client, "¿Cuántos días de teletrabajo permitía la política de 2023?", sources
+    )
+    assert meta["abstention_reason"] is None and meta["superseded_ignored"] == []
+    assert "3 días" in text and "[documento marcado como sustituido]" in text
+    assert [p["id"] for p in json.loads(calls[0]["input"][0]["content"])["passages"]] == [1, 2]
+
+
+def test_when_only_superseded_documents_exist_the_answer_says_so():
+    sources = [{"content": OLD, "filename": "tele-2023.pdf", "superseded": True}]
+    client, _ = scripted(selection("Se permite teletrabajar hasta 3 días por semana."), YES)
+    text, _, meta = documentary_answer(client, "¿Cuántos días de teletrabajo puedo hacer?", sources)
+    assert meta["abstention_reason"] is None
+    assert "[documento marcado como sustituido]" in text
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "¿Quién tiene que aprobar un gasto de 800 euros?",
+        "¿Quién aprueba un gasto de 2.000 euros?",
+    ],
+)
+def test_an_amount_in_the_question_is_not_a_scope_the_document_must_repeat(question):
+    from app.evidence import missing_scope
+
+    assert not missing_scope(question, "Hasta 300 euros aprueba el responsable; más, Finanzas.")
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "¿Qué dice el procedimiento INC-99?",
+        "¿Cuántos días de teletrabajo permitía la versión de 2024?",
+        "¿Qué dice la política TEL-7?",
+    ],
+)
+def test_codes_and_years_still_have_to_exist_in_the_documents(question):
+    from app.evidence import missing_scope
+
+    assert missing_scope(question, "Política de teletrabajo 2025. Formulario TEL-01.")
