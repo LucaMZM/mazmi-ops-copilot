@@ -357,3 +357,48 @@ def test_superseded_passages_are_labelled_for_the_model_and_current_ones_are_not
 
     items = passages([{"content": "a"}, {"content": "b", "superseded": True}])
     assert "estado" not in items[0] and items[1]["estado"] == "sustituido"
+
+
+def test_answer_lead_is_shown_only_when_it_is_verbatim_in_the_quote():
+    from app.evidence import literal_lead
+
+    shown = ["El teletrabajo se permite hasta 2 días por semana. Los lunes son presenciales."]
+    assert literal_lead("2 días por semana.", shown) == "2 días por semana"
+    assert literal_lead("dos días a la semana", shown) is None  # paraphrase
+    assert literal_lead("2 DÍAS", shown) is None  # case must match exactly
+    assert literal_lead("", shown) is None
+    assert literal_lead(shown[0], shown) is None  # the whole quote is not a summary
+
+
+def test_answer_lead_leads_the_answer_and_can_be_switched_off(monkeypatch):
+    client, _ = scripted(selection("Se permite teletrabajar hasta 2 días por semana."), YES)
+    text, _, meta = documentary_answer(client, QUESTION, SOURCES)
+    assert text.startswith("Respuesta: 2 días\n\nSegún t.md")
+    assert meta["answer_lead"] == "2 días" and "«" in text and "[1]" in text
+    monkeypatch.setattr(settings, "answer_lead", False)
+    client, _ = scripted(selection("Se permite teletrabajar hasta 2 días por semana."), YES)
+    text, _, meta = documentary_answer(client, QUESTION, SOURCES)
+    assert text.startswith("Según t.md") and "answer_lead" not in meta
+    # A paraphrased span from the model is silently dropped; the literal evidence remains.
+    monkeypatch.setattr(settings, "answer_lead", True)
+    para = {"reason": "x", "answers": True, "answer": "dos días semanales"}
+    client, _ = scripted(selection("Se permite teletrabajar hasta 2 días por semana."), para)
+    text, _, meta = documentary_answer(client, QUESTION, SOURCES)
+    assert text.startswith("Según t.md") and "answer_lead" not in meta
+
+
+def test_verified_quotes_focus_the_answer_when_the_question_shares_no_words_with_it():
+    from app.evidence import focused_quote
+
+    text = (
+        "Cláusula 1. Vigencia\nEl contrato tiene una vigencia de 24 meses desde el 1 de marzo.\n"
+        "Cláusula 2. Plazos de entrega\nPenínsula 48 horas desde la recogida.\n"
+        "Cláusula 3. Penalizaciones\nPor cada día natural de retraso se aplica una penalización del 2 %.\n"
+        "Cláusula 4. Tarifa\nLa tarifa es de 4,80 euros por bulto de hasta 30 kg en la península.\n"
+        "Cláusula 5. Resolución\nCualquiera de las partes puede resolver el contrato con 60 días de preaviso."
+    )
+    question = "¿Cuánto cuesta el envío estándar?"
+    assert "60 días de preaviso" in focused_quote(question, text)  # No overlap: whole passage.
+    anchored = focused_quote(question, text, anchors=["La tarifa es de 4,80 euros por bulto"])
+    assert "4,80 euros" in anchored and "60 días de preaviso" not in anchored
+    assert len(anchored) < len(text) / 2

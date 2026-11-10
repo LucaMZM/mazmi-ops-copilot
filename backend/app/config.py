@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     ollama_embedding_model: str = "embeddinggemma"
     # How long Ollama keeps a model in memory after a request ("0" unloads at once).
     ollama_keep_alive: str = Field(default="5m", pattern=r"^(0|-1|\d{1,4}[smh])$")
+    # Short "Respuesta:" line above the quoted evidence, only when the model's answer span
+    # appears verbatim in the quote shown to the user (see evidence.literal_lead).
+    answer_lead: bool = True
     # Load both models into memory when the backend starts, so the first question of the day
     # does not pay the cold-start cost (15-30 s on an 8 GB machine). Best effort, never blocks.
     ollama_warmup: bool = True
