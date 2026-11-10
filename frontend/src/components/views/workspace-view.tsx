@@ -103,13 +103,12 @@ export function WorkspaceView({
           )}
           <div className="suggestedPrompts">
             <h4>Para empezar</h4>
-            {["¿Cuántos días de vacaciones hay?", "¿Qué información hay sobre el acceso?"].map(
-              (q) => (
-                <button key={q} onClick={() => onPrompt(q)}>
-                  {q}
-                </button>
-              ),
-            )}
+            {["¿Qué dice la documentación sobre ", "Lista los tickets del workspace"].map((q) => (
+              <button key={q} onClick={() => onPrompt(q)}>
+                {q.trim()}
+                {q.endsWith(" ") ? " …" : ""}
+              </button>
+            ))}
           </div>
         </section>
 

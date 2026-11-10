@@ -1,0 +1,141 @@
+{
+  "mode": "live-ollama-fixed-passages",
+  "retrieval": "fixed-fixture-passages; no vector search or embeddings measured",
+  "cases": [
+    {
+      "name": "onboarding_deadline",
+      "check": "independent_fixed_passages",
+      "expected_abstention": false,
+      "mock_expected_abstention": false,
+      "gold_label_mode": "fixture",
+      "gold_passage_ids": [
+        1
+      ],
+      "before_correct": true,
+      "after_correct": true,
+      "assessment_failed": false,
+      "abstained": false,
+      "reason": null,
+      "policy": "quoted_v6",
+      "model_assessment_performed": true,
+      "selected_passage_ids": [
+        1
+      ],
+      "citation_ids_valid": true,
+      "gold_source_selection_correct": true,
+      "duration_ms": 6047.85,
+      "provider_metrics": {
+        "prompt_eval_count": 320,
+        "eval_count": 78,
+        "total_duration": 3452151709,
+        "load_duration": 1209834,
+        "prompt_eval_duration": 289527000,
+        "eval_duration": 3095886000,
+        "done_reason": "stop",
+        "content_chars": 307,
+        "thinking_chars": 0
+      }
+    },
+    {
+      "name": "travel_approval_and_archive",
+      "check": "independent_fixed_passages",
+      "expected_abstention": false,
+      "mock_expected_abstention": false,
+      "gold_label_mode": "fixture",
+      "gold_passage_ids": [
+        1,
+        2
+      ],
+      "before_correct": true,
+      "after_correct": true,
+      "assessment_failed": false,
+      "abstained": false,
+      "reason": null,
+      "policy": "quoted_v6",
+      "model_assessment_performed": true,
+      "selected_passage_ids": [
+        1,
+        2
+      ],
+      "citation_ids_valid": true,
+      "gold_source_selection_correct": true,
+      "duration_ms": 9112.98,
+      "provider_metrics": {
+        "prompt_eval_count": 359,
+        "eval_count": 111,
+        "total_duration": 4797814542,
+        "load_duration": 3197667,
+        "prompt_eval_duration": 531943000,
+        "eval_duration": 4195813000,
+        "done_reason": "stop",
+        "content_chars": 443,
+        "thinking_chars": 0
+      }
+    },
+    {
+      "name": "partial_travel_evidence",
+      "check": "independent_fixed_passages",
+      "expected_abstention": true,
+      "mock_expected_abstention": true,
+      "gold_label_mode": "fixture",
+      "gold_passage_ids": [],
+      "before_correct": false,
+      "after_correct": true,
+      "assessment_failed": false,
+      "abstained": true,
+      "reason": "missing_fact_facet",
+      "policy": "extractive_v5_focused",
+      "model_assessment_performed": false,
+      "selected_passage_ids": [],
+      "citation_ids_valid": true,
+      "gold_source_selection_correct": false,
+      "duration_ms": 0.34
+    },
+    {
+      "name": "unresolved_equipment_deadline",
+      "check": "independent_fixed_passages",
+      "expected_abstention": true,
+      "mock_expected_abstention": true,
+      "gold_label_mode": "fixture",
+      "gold_passage_ids": [],
+      "before_correct": false,
+      "after_correct": true,
+      "assessment_failed": false,
+      "abstained": true,
+      "reason": "conflicting_evidence",
+      "policy": "extractive_v5_focused",
+      "model_assessment_performed": false,
+      "selected_passage_ids": [],
+      "citation_ids_valid": true,
+      "gold_source_selection_correct": false,
+      "duration_ms": 0.28
+    }
+  ],
+  "attempted_cases": 4,
+  "correct_cases": 4,
+  "accuracy_all_attempts": 1.0,
+  "provider_errors": 0,
+  "completed_cases": 4,
+  "assessment_failures": 0,
+  "assessor_calls": 2,
+  "before_correct_abstentions": 0,
+  "before_description": "Legacy citation-only gate; historical extractive_v2 comparison is separate below",
+  "after_correct_abstentions": 2,
+  "unanswerable_cases": 2,
+  "false_abstentions": 0,
+  "answerable_cases": 2,
+  "answerable_provider_errors": 0,
+  "unanswerable_provider_errors": 0,
+  "answer_precision": 1.0,
+  "gold_source_selection_correct": 2,
+  "all_citation_ids_valid": true,
+  "historical_extractive_v2_comparison": {
+    "evidence": "frozen mocked observations; live results are not a paired model comparison",
+    "matching_cases": 0,
+    "unanswerable_cases": 0,
+    "previous_correct_abstentions": 0,
+    "current_correct_abstentions": 0,
+    "current_false_abstentions": 0
+  },
+  "limitation": "Mock verdicts test backend guards, not model semantics. Live mode tests only the assessor on fixed passages, not the RAG pipeline. Exact passages and valid citation IDs do not prove applicability. Known semantic gaps and conservative refusals remain."
+}

@@ -8,7 +8,7 @@ MAZMI responde con frases literales de los documentos subidos por el usuario, se
 
 Pila: Next.js 16 / React 19, FastAPI, PostgreSQL 17 con pgvector y Ollama (Qwen3 4B + EmbeddingGemma). Pipeline RAG directo en Python, sin LangChain ni frameworks de agentes.
 
-> **Estado:** funciona de extremo a extremo con modelos locales y base de datos reales; las cifras medidas, incluidos los fallos, están en [VALIDATION.md](VALIDATION.md). Qwen3 4B en un Mac de 8 GB es lento y conservador, así que **no hay etiqueta `v1.0.0`** (ver los criterios en [VALIDATION.md](VALIDATION.md#criterios-de-aceptación-del-modelo-local)). No es un despliegue de producción.
+> **Estado:** funciona de extremo a extremo con modelos locales y base de datos reales; las cifras medidas, incluidos los fallos, están en [VALIDATION.md](VALIDATION.md). Qwen3 4B en un Mac de 8 GB es lento y conservador, así que **no hay etiqueta `v1.0.0`** (criterios y fallos abiertos en [VALIDATION.md](VALIDATION.md#criterios-de-aceptación-del-modelo-local)). No es un despliegue de producción.
 
 ![Copilot: respuesta con citas literales](docs/screenshots/copilot.png)
 
@@ -82,6 +82,10 @@ cd backend && python -m app.evaluate_local --live --cases evals/local_holdout_v3
 ```
 
 Las pruebas normales no llaman a ningún modelo ni descargan nada. Las evaluaciones con modelos reales son explícitas y se niegan a trabajar sobre una base que no sea nueva, vacía y dedicada.
+
+## Resultados medidos (resumen)
+
+Con Ollama real (Qwen3 4B + EmbeddingGemma) en un Mac de 8 GB, sobre tres conjuntos ficticios en bases nuevas: **8/8 originales, 13/13 reservados y 11/11 de desarrollo**, sin respuestas sin soporte, con todas las citas literales y los 13 recorridos de seguridad en verde; latencia p50 de 7 a 9 s por pregunta y pico de ≈3,8 GB de memoria en Ollama. En el corpus adversarial de pasajes fijos, 25/27: **un conflicto parafraseado entre pasajes sigue sin detectarse**. Antes del cambio, el mismo conjunto reservado daba 5 respuestas sin soporte (sin razonamiento) o 2 errores y mediana de 44 s (con razonamiento). Tablas, causas y fallos abiertos: [VALIDATION.md](VALIDATION.md).
 
 ## Límites conocidos
 
