@@ -20,6 +20,9 @@ SYSTEM = """Selecciona una única llamada a la herramienta autorizada para la pe
 get_tickets consulta los últimos tickets del workspace actual. Respeta el límite explícito
 del usuario; si no indica cantidad usa 5. El límite permitido es de 1 a 20.
 create_ticket solo prepara una propuesta para confirmación humana, nunca la ejecuta.
+En create_ticket: title es un resumen breve de la tarea (no copies la petición entera);
+description explica qué hay que hacer y dónde, solo con datos de la petición; priority traduce
+la prioridad pedida (baja=LOW, media=MEDIUM, alta=HIGH, urgente=URGENT; sin indicar=MEDIUM).
 No generes narración, resultados, citas ni llamadas adicionales.
 """
 

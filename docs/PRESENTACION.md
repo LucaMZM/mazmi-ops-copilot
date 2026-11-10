@@ -10,7 +10,7 @@ MAZMI funciona con **tus propios documentos y usuarios**: no hay datos precargad
 4. En *Configuración* pulsa **Verificar Ollama**. La primera vez puede tardar al cargar los modelos en memoria; verás el resultado real, no una etiqueta.
 5. En *Conocimiento* sube los documentos y espera a que pasen a «Listo».
 
-Haz una pregunta de calentamiento antes de la reunión: el primer turno carga el modelo en memoria y es el más lento.
+El backend carga los modelos al arrancar, así que la primera pregunta no paga el arranque en frío. Si Ollama estaba apagado al iniciar el backend, haz una pregunta de calentamiento antes de la reunión.
 
 ## Recorrido
 

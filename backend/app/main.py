@@ -51,7 +51,7 @@ from .db import DatabaseBusy, close_pool, get_conn
 from .documents import recover_interrupted_indexing
 from .documents import router as documents_router
 from .errors import provider_error
-from .rag import prepare_query, retrieve
+from .rag import mark_superseded, prepare_query, retrieve
 from .schemas import (
     ActionDecision,
     ChatRequest,
@@ -75,10 +75,20 @@ def _recover_in_background() -> None:
         logger.error("Indexing recovery skipped: %s", type(exc).__name__)
 
 
+def _warm_up_in_background() -> None:
+    from .providers import Ollama
+
+    loaded = Ollama().warm_up()
+    logger.info("Ollama warm-up: %d of 2 models loaded", len(loaded))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup never waits on the database: recovery is best-effort and asynchronous.
+    # Startup never waits on the database or on Ollama: both steps are best-effort and
+    # asynchronous.
     Thread(target=_recover_in_background, daemon=True, name="mazmi-recovery").start()
+    if settings.ollama_warmup:
+        Thread(target=_warm_up_in_background, daemon=True, name="mazmi-warmup").start()
     yield
     await run_in_threadpool(close_pool)
 
@@ -331,6 +341,7 @@ def gather_sources(payload: ChatRequest, history: list[dict], user: Principal):
             lexical_query=payload.message,
             prepared=prepared,
         )
+        mark_superseded(conn, user.workspace_id, sources)
     diagnostics["embedding_ms"] = embedding_ms
     return sources, diagnostics, int((time.perf_counter() - started) * 1000)
 
@@ -455,6 +466,7 @@ def persist_turn(
                 excerpt=s["excerpt"],
                 score=s["score"],
                 section=s.get("section"),
+                superseded=bool(s.get("superseded")),
             )
             for s in sources
         ]

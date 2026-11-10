@@ -11,6 +11,30 @@ Medido el 10 de noviembre de 2026 en un MacBook Air M2 de **8 GB**, con Ollama 0
 | Modelo real, pasajes fijos (`evaluate_grounding --live`) | Juicio de suficiencia con casos adversariales | Recuperación ni embeddings |
 | Modelo real, pipeline completo (`evaluate_local --live`) | HTTP, base real, embeddings, citas, ASK/DO, aprobaciones, tiempos, memoria | Generalización: los corpus son pequeños y ficticios |
 
+## Prueba con un corpus realista (PDF, DOCX, tablas y versiones)
+
+Para probarlo como lo haría una empresa se creó un corpus ficticio de diez documentos de «Aurelia Logística» (`backend/evals/realistic/`): manual del empleado y procedimiento de TI en **DOCX con tablas**, política de gastos y contrato de transporte en **PDF con tablas**, dos versiones de la política de teletrabajo (la de 2023 declara estar sustituida), políticas en Markdown y una nota con una instrucción dirigida al asistente. Las 60 preguntas están escritas como las haría una persona: coloquiales y sin tildes, de fila de tabla, de tramo («¿quién aprueba un gasto de 800 euros?»), de vigencia, de varias partes y sin respuesta.
+
+| Conjunto realista | Correctas | Abstenciones correctas | Falsas abstenciones | Sin soporte | Citas literales | Seguridad | p50 / p95 |
+|---|---:|---:|---:|---:|:---:|---:|---:|
+| Desarrollo (35), **antes** de las correcciones | 7/27 | 8/8 | **19** | 1 incorrecta | sí | 13/13 | — |
+| Desarrollo (35), final | 27/27 | 7/8 | 0 | **1** | sí | 13/13 | 17,2 s / 28,9 s |
+| **Reservado (25), final** | **19/19** | **6/6** | **0** | **0** | sí | 13/13 | 18,2 s / 30,1 s |
+
+El conjunto reservado se escribió antes de medir y no se ejecutó hasta tener el código cerrado con el de desarrollo; después se repitió una vez con el código final (tras corregir una regresión detectada en otro conjunto) con el mismo resultado, 25/25. Ficheros: `v4-realistic-*.json`.
+
+**Qué destapó el corpus realista (todo corregido de forma general, con pruebas):**
+
+1. La guarda de conflictos comparaba todos los fragmentos recuperados, tuvieran o no que ver con la pregunta: con dos versiones de una política en la biblioteca, **19 de 27 preguntas con respuesta se rechazaban**. Ahora solo cuentan las frases relacionadas con la pregunta.
+2. Una política sustituida se citaba como vigente. Ahora un documento que declara estar sustituido se ignora salvo que se pregunte por esa versión.
+3. Una cantidad en la pregunta («800 euros») se exigía literalmente en el documento. Los códigos y los años siguen siendo obligatorios.
+4. **Las propuestas de ticket tardaban 90–120 s** y rozaban el límite: con herramientas nativas el modelo ignora `think=false`. Ahora tardan **≈4 s** (medido en los cinco conjuntos).
+5. Una «respuesta» que repetía la pregunta («la responsable del workspace») se aceptaba como dato.
+
+**Fallo abierto del corpus realista:** `neg_customer_shipping_fee`. A «¿Cuánto cuesta el envío estándar a un cliente?» el sistema responde con la tarifa que el transportista cobra a la empresa (4,80 € por bulto), citada literalmente del contrato. La cita es real, pero no responde a lo preguntado: Qwen3 4B no distingue a quién se aplica la tarifa.
+
+Las latencias de este corpus son mayores que las de los conjuntos pequeños porque los pasajes son más largos y el equipo de 8 GB tenía otras aplicaciones abiertas durante la medición.
+
 ## Resultado principal: pipeline completo con Ollama real
 
 `evaluate_local --live` sobre tres conjuntos, cada uno en una base nueva y vacía. Verifica además, por cada respuesta, que **toda cita entre «» existe literalmente en el fragmento que cita** y que aparecen los datos esperados.
@@ -20,6 +44,8 @@ Medido el 10 de noviembre de 2026 en un MacBook Air M2 de **8 GB**, con Ollama 0
 | 8 casos originales | 4/4 | 4/4 | 0 | 0 | 0 | sí | 13/13 |
 | 13 casos reservados (nuevos) | 7/7 | 6/6 | 0 | 0 | 0 | sí | 13/13 |
 | 11 casos de desarrollo | 7/7 | 4/4 | 0 | 0 | 0 | sí | 13/13 |
+
+Estos tres conjuntos se repitieron con el código final de la prueba realista (`v4-original-8.json`, `v4-holdout-13.json`, `v4-dev-11.json`) con el mismo resultado; el corpus adversarial de pasajes fijos sigue en 25/27.
 
 Los 13 casos reservados (`local_holdout_v3.json`) se escribieron y se confirmaron **antes** de cambiar el pipeline y no se usaron para ajustar prompts, guardas ni umbrales. Los 8 originales sí habían servido para optimizar versiones anteriores. El conjunto de desarrollo (`local_dev_v3.json`) se usó para iterar.
 
@@ -72,8 +98,8 @@ La latencia incluye recuperación (unos milisegundos de SQL y ~80 ms de embeddin
 
 ## Pruebas automáticas
 
-- Backend: **304 pruebas** (PostgreSQL real con esquemas aislados), `ruff` limpio. Incluye aislamiento por workspace, aprobación única por solicitante, ASK sin mutación, transacciones sin bloqueos durante la inferencia, idempotencia, streaming y 22 pruebas del modo de evidencia verificada (citas inventadas, citas de otro pasaje, reintento, ajuste, instrucciones incrustadas, fallos del evaluador).
-- Frontend: **44 pruebas**, `tsc`, ESLint y `next build`. Comprueban que no queda ninguna etiqueta de demo, simulación ni proveedor externo.
+- Backend: **335 pruebas** (PostgreSQL real con esquemas aislados), `ruff` limpio. Incluye aislamiento por workspace, aprobación única por solicitante, ASK sin mutación, transacciones sin bloqueos durante la inferencia, idempotencia, streaming y 22 pruebas del modo de evidencia verificada (citas inventadas, citas de otro pasaje, reintento, ajuste, instrucciones incrustadas, fallos del evaluador).
+- Frontend: **45 pruebas**, `tsc`, ESLint y `next build`. Comprueban que no queda ninguna etiqueta de demo, simulación ni proveedor externo.
 - Sin `TEST_DATABASE_URL` las pruebas de integración se omiten y no se dan por pasadas. Las pruebas normales no llaman a ningún modelo ni descargan nada.
 
 ## Recuperación con EmbeddingGemma (se mantiene)
@@ -107,13 +133,13 @@ Un `v1.0.0` exige cumplirlos **todos**:
 
 | Criterio | Estado |
 |---|---|
-| Los tres conjuntos de pipeline completo superan `automated_fixture_checks_passed` | ✅ cumplido |
-| Cero respuestas sin soporte en los conjuntos de pipeline | ✅ cumplido |
+| Los conjuntos pequeños y el reservado realista superan `automated_fixture_checks_passed` | ✅ cumplido |
+| Cero respuestas sin soporte en los conjuntos de pipeline | ❌ **1 abierto** en desarrollo realista (`neg_customer_shipping_fee`) |
 | Toda cita mostrada es literal | ✅ cumplido (todas las respuestas medidas) |
 | Cero timeouts y errores técnicos | ✅ cumplido |
 | Cero falsas abstenciones en los conjuntos de pipeline | ✅ cumplido |
 | Cero respuestas sin soporte en el corpus adversarial de pasajes fijos | ❌ **1 abierto** (`paraphrased_conflict`) |
-| Evaluación con corpus mayor o documentos reales de una organización | ❌ no realizada (32 preguntas ficticias) |
+| Evaluación con documentos reales de una organización | ❌ no realizada (corpus realista pero ficticio, 92 preguntas en total) |
 | Voz (Faster-Whisper/Piper) comprobada de extremo a extremo | ❌ no verificada |
 
 **Decisión: no se crea tag ni release.** Se han resuelto los fallos del modelo local que bloqueaban 2.0, pero queda una respuesta sin soporte reproducible y la validación es pequeña y sintética.
@@ -124,7 +150,7 @@ No se ha descargado ningún modelo. Qwen3 8B (≈5 GB cuantizado) apenas cabría
 
 ## Pendiente y no verificado
 
-- Conflictos parafraseados entre pasajes (`paraphrased_conflict`).
+- Conflictos parafraseados entre pasajes (`paraphrased_conflict`) y distinguir a quién se aplica un dato (`neg_customer_shipping_fee`).
 - Corpus mayores y documentos reales; recuperación a gran escala.
 - Voz real de extremo a extremo.
 - Comparación con un modelo mayor (requiere tu autorización y espacio/memoria).
