@@ -184,6 +184,7 @@ export function SourceChip({
 }
 
 const ORIGIN = /^Según (.+):$/;
+const LEAD = /^Respuesta: (.+)$/;
 
 function Inline({
   text,
@@ -238,6 +239,14 @@ export const AnswerText = memo(function AnswerText({
           <div key={i} className="answerBlock">
             {block.split("\n").map((line, k) => {
               const origin = line.match(ORIGIN);
+              const lead = line.match(LEAD);
+              if (lead)
+                return (
+                  <span className="answerLead" key={k}>
+                    <span>Respuesta</span>
+                    <strong>{lead[1]}</strong>
+                  </span>
+                );
               return origin ? (
                 <span className="answerOrigin" key={k}>
                   Según <cite>{origin[1]}</cite>

@@ -405,7 +405,7 @@ def _units(text):
     return units
 
 
-def focused_quote(question, text, max_chars=700):
+def focused_quote(question, text, max_chars=700, anchors=()):
     """Return verbatim sentences of ``text`` that address ``question``.
 
     Deterministic and extractive: every returned unit (sentence, list item or table row)
@@ -418,7 +418,9 @@ def focused_quote(question, text, max_chars=700):
     body = " ".join(units)
     if len(body) <= 240 or len(units) <= 2:
         return body
-    wanted = _terms(question)
+    # The model's verified quotes anchor the focus: a paraphrased question ("¿cuánto cuesta el
+    # envío?") shares no words with the sentence that answers it ("La tarifa es de 4,80…").
+    wanted = _terms(question) | _terms(" ".join(anchors))
     scores = [len(wanted & _terms(unit)) for unit in units]
     best = max(scores)
     if best == 0:
@@ -462,6 +464,23 @@ HISTORIC = re.compile(
 )
 
 
+def literal_lead(span, shown_texts, max_chars=140):
+    """The answer span exactly as written in the shown quote, or None.
+
+    The model proposes a short span ("23 días laborables"); it is displayed only if it is a
+    verbatim substring (case, accents and spacing included) of what the user is shown, never
+    a paraphrase, and only if it is clearly shorter than the evidence it summarizes.
+    """
+    span = " ".join(span.split()).strip(" .;:,")
+    if not span or len(span) > max_chars:
+        return None
+    for shown in shown_texts:
+        flat = " ".join(shown.split())
+        if span in flat and len(span) <= 0.6 * len(flat):
+            return span
+    return None
+
+
 def visible_passages(question, items, sources):
     """Passages that may answer: documents marked as superseded are ignored unless asked for.
 
@@ -497,7 +516,7 @@ def documentary_answer(client, question, sources, history=None, emit=None):
         "abstention_reason": None,
     }
 
-    def finish(reason=None, selected=None, quotes=None):
+    def finish(reason=None, selected=None, quotes=None, lead=None):
         meta["abstention_reason"] = reason
         meta["duration_ms"] = int((time.perf_counter() - started) * 1000)
         if reason:
@@ -514,9 +533,11 @@ def documentary_answer(client, question, sources, history=None, emit=None):
             if focused:
                 # Literal sentences that address the question, with their origin. The
                 # full stored passage stays one click away in the evidence inspector.
-                blocks = []
+                blocks, shown_texts = [], []
                 for p in selected:
-                    shown = focused_quote(question, p["text"])
+                    shown = focused_quote(
+                        question, p["text"], anchors=(quotes or {}).get(p["id"], [])
+                    )
                     # A verified quote the focusing step left out is appended, never lost.
                     extra = [
                         q
@@ -524,10 +545,15 @@ def documentary_answer(client, question, sources, history=None, emit=None):
                         if not verify_quote(q, shown, min_chars=1)
                     ]
                     shown = " … ".join([shown, *extra]) if extra else shown
+                    shown_texts.append(shown)
                     blocks.append(
                         f"{_origin(sources[p['id'] - 1])}:\n«{quote_text(shown)}» [{p['citation']}]"
                     )
                 text = "\n\n".join(blocks)
+                span = literal_lead(lead, shown_texts) if lead and settings.answer_lead else None
+                if span:
+                    meta["answer_lead"] = span
+                    text = f"Respuesta: {span}\n\n{text}"
             else:
                 # Whole retrieved passages preserve negations and qualifications.
                 text = "Pasajes documentales seleccionados:\n\n" + "\n\n".join(
@@ -839,4 +865,4 @@ def _quoted_assessment(client, question, history, items, visible, meta, finish, 
     trace["answer_check"] = bool(check.answers and check.answer.strip())
     if not trace["answer_check"]:
         return finish("insufficient_evidence")
-    return finish(selected=selected, quotes=quotes)
+    return finish(selected=selected, quotes=quotes, lead=check.answer)
