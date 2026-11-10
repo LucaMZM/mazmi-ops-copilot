@@ -24,10 +24,12 @@ Las variables están en [.env.example](.env.example). Las relevantes:
 | `OLLAMA_EMBEDDING_MODEL` | `embeddinggemma` | Modelo de embeddings (768 d) |
 | `OLLAMA_REASONING` | `off` | `off` desactiva la fase de razonamiento de Qwen3; `on` la mantiene |
 | `OLLAMA_KEEP_ALIVE` | `5m` | Tiempo que el modelo permanece en memoria |
+| `OLLAMA_WARMUP` | `true` | Carga los dos modelos al arrancar el backend para evitar el arranque en frío |
 | `OLLAMA_NUM_CTX` | `4096` | Contexto por petición |
 | `OLLAMA_TIMEOUT_SECONDS` | `120` | Límite de cada llamada al modelo |
 | `CHAT_MAX_CONCURRENT` | `1` | Consultas de IA simultáneas |
 | `EVIDENCE_MODE` | `quoted_v6` | Evidencia con citas verificadas (ver abajo) |
+| `ANSWER_LEAD` | `true` | Línea «Respuesta: …» sobre la evidencia, solo si el dato aparece literal en la cita |
 
 Los valores antiguos `model_default` y `no_think_directive` de `OLLAMA_REASONING` se siguen aceptando.
 
@@ -39,7 +41,14 @@ El diagnóstico de MAZMI 2.0 (resultados en [el histórico](docs/HISTORICO-VALID
 2. **Evidencia insuficiente aceptada.** Sin razonamiento, el modelo marcaba como suficientes pasajes del mismo tema que no contenían el dato. Un único ID de pasaje no es comprobable. Ahora el modelo debe **copiar una cita literal por cada parte de la pregunta**; el servidor comprueba que cada cita existe en el pasaje que nombra y una segunda llamada, con solo la pregunta y las citas verificadas, confirma que contienen el dato pedido. Las guardas deterministas (alcance, hechos, condiciones, contradicciones literales, instrucciones incrustadas) se mantienen antes y después.
 3. **Falsas abstenciones por una guarda léxica.** La guarda de «límite/importe» exigía esas palabras exactas en el documento y rechazaba «alojamiento máximo». Se amplió con sinónimos (máximo, tope, techo).
 
-El texto mostrado al usuario sale siempre del pasaje almacenado, nunca del modelo.
+4. **Propuestas de ticket lentas (90–120 s).** Con herramientas nativas, Qwen3 4B ignora `think=false` y escribe unos 900 tokens de razonamiento como texto antes de la llamada. Ahora los argumentos de la única herramienta que el servidor ha autorizado se piden con la misma gramática JSON que la evidencia: 2–4 s por propuesta. La autorización, la validación y la confirmación humana no cambian.
+5. **Documentos reales.** Las pruebas con un corpus realista (PDF, DOCX, tablas, versiones) destaparon tres defectos generales, ya corregidos: la guarda de conflictos comparaba fragmentos que no tenían que ver con la pregunta; una política sustituida se citaba como vigente; y una cantidad en la pregunta («un gasto de 800 euros») se exigía literalmente en el documento.
+
+El texto mostrado al usuario sale siempre del pasaje almacenado, nunca del modelo. La línea «Respuesta: …» solo aparece cuando el dato que propone el modelo está escrito tal cual en la cita mostrada.
+
+## Versiones de un documento
+
+Si un documento dice de sí mismo que está «sustituido por…», «derogado» o que «ya no está en vigor», MAZMI no lo usa para responder preguntas sobre la situación actual. Sí lo usa cuando la pregunta mira hacia atrás (un año, «la versión anterior»), y entonces lo indica junto a la cita. No hay fechas de vigencia ni un campo de estado: depende de que el propio documento lo declare.
 
 ## Memoria y recursos
 

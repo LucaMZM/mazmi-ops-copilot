@@ -662,6 +662,10 @@ def documentary_answer(client, question, sources, history=None, emit=None):
     return finish(selected=selected)
 
 
+OPEN_QUESTION = re.compile(
+    r"^\W*(?:(?:a|en|con|de|por|hasta|desde|entre|para)\s+)?"
+    r"(?:quien(?:es)?|como|cual(?:es)?|cuant[oa]s?|que|donde|cuando)\b"
+)
 SNAP_MIN_RATIO = 0.88
 
 
@@ -862,7 +866,19 @@ def _quoted_assessment(client, question, history, items, visible, meta, finish, 
             AnswerCheck,
             "answer_check",
         )
-        return check, reason, bool(check and check.answers and check.answer.strip())
+        answered = bool(check and check.answers and check.answer.strip())
+        # An "answer" that only repeats words of the question adds no information: asked for
+        # the name of "la responsable del workspace", the model offered that same phrase.
+        # Only for open questions: in a yes/no question ("¿Puedo volar en business?") the
+        # answer legitimately repeats its words.
+        if (
+            answered
+            and OPEN_QUESTION.search(normalize(question))
+            and normalize(check.answer).strip(" .?¿") in normalize(question)
+        ):
+            trace["answer_echoes_question"] = True
+            answered = False
+        return check, reason, answered
 
     check, reason, answered = check_quotes(quotes)
     if reason:

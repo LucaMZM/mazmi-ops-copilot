@@ -27,7 +27,8 @@ Pila: Next.js 16 / React 19, FastAPI, PostgreSQL 17 con pgvector y Ollama (Qwen3
 1. **Ingesta.** PDF, DOCX, TXT o Markdown de hasta 20 MB. El texto se divide por estructura (encabezados, párrafos, listas, filas de tabla) y cada fragmento guarda su sección.
 2. **Recuperación.** Búsqueda vectorial exacta y texto completo en español, ambas filtradas por workspace, estado del documento y colección de embeddings; se fusionan con RRF y se limita a tres fragmentos por documento.
 3. **Evidencia verificada.** Guardas deterministas comprueban alcance, hechos pedidos, condiciones y contradicciones literales. Después, el modelo copia una cita literal por cada parte de la pregunta; **el servidor verifica que cada cita existe en el pasaje que nombra**, y una segunda llamada acotada confirma que esas citas contienen el dato pedido. Cualquier fallo es una abstención.
-4. **Respuesta.** El servidor muestra frases literales del pasaje almacenado, con documento, sección y un identificador de cita. El texto que ve el usuario nunca lo escribe el modelo.
+4. **Respuesta.** El servidor muestra frases literales del pasaje almacenado, con documento, sección y un identificador de cita, precedidas de una línea breve con el dato cuando ese dato aparece tal cual en la cita. El texto que ve el usuario nunca lo escribe el modelo.
+5. **Versiones.** Un documento que declara estar sustituido o fuera de vigor no se usa para preguntas sobre la situación actual; sí para preguntas sobre esa versión, indicándolo.
 
 Los documentos son datos no fiables: las llamadas documentales no reciben herramientas y las llamadas con herramientas no reciben documentos ni historial.
 
