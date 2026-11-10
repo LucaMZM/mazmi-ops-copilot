@@ -54,6 +54,35 @@ class Ollama:
                 "Ollama no disponible o respuesta incompatible. Comprueba servicio y modelos instalados."
             ) from exc
 
+    def warm_up(self):
+        """Load the chat and embedding models and keep them resident. Returns what loaded.
+
+        Uses Ollama's documented load-only calls (an empty /api/generate request and a tiny
+        /api/embed). Never raises: an unavailable server simply means no warm-up.
+        """
+        loaded = []
+        for path, body in (
+            (
+                "/api/generate",
+                {"model": settings.generation_model, "keep_alive": settings.ollama_keep_alive},
+            ),
+            (
+                "/api/embed",
+                {
+                    "model": settings.embedding_model,
+                    "input": "calentamiento",
+                    "keep_alive": settings.ollama_keep_alive,
+                },
+            ),
+        ):
+            try:
+                with self.http() as client:
+                    client.post(path, json=body).raise_for_status()
+                loaded.append(body["model"])
+            except (ProviderUnavailable, httpx.HTTPError):
+                continue
+        return loaded
+
     def digest(self, model):
         with self.http() as client:
             response = client.get("/api/tags")

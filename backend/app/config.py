@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     ollama_embedding_model: str = "embeddinggemma"
     # How long Ollama keeps a model in memory after a request ("0" unloads at once).
     ollama_keep_alive: str = Field(default="5m", pattern=r"^(0|-1|\d{1,4}[smh])$")
+    # Load both models into memory when the backend starts, so the first question of the day
+    # does not pay the cold-start cost (15-30 s on an 8 GB machine). Best effort, never blocks.
+    ollama_warmup: bool = True
     # Qwen3 reasoning phase. "off" (measured default, see VALIDATION.md) disables it and
     # relies on the quote-verified evidence schema; "on" keeps the model's own default.
     ollama_reasoning: Literal["off", "on"] = "off"

@@ -350,3 +350,28 @@ def test_reasoning_off_disables_thinking_and_is_never_greedy(monkeypatch):
     assert payload["messages"][0]["content"].endswith("/no_think")
     assert payload["options"]["temperature"] == 0.7 and payload["options"]["top_k"] == 20
     assert payload["format"] == {"type": "object"} and payload["options"]["seed"] == 42
+
+
+def test_warm_up_loads_both_models_with_the_configured_keep_alive():
+    seen = []
+
+    def server(req):
+        seen.append((req.url.path, json.loads(req.content)))
+        return httpx.Response(200, json={})
+
+    assert Ollama(httpx.MockTransport(server)).warm_up() == ["qwen3:4b", "embeddinggemma"]
+    assert [path for path, _ in seen] == ["/api/generate", "/api/embed"]
+    assert all(body["keep_alive"] == settings.ollama_keep_alive for _, body in seen)
+    assert "prompt" not in seen[0][1]  # load-only: nothing is generated
+
+
+def test_warm_up_never_raises_when_ollama_is_down_or_a_model_is_missing():
+    def down(req):
+        raise httpx.ConnectError("private address")
+
+    assert Ollama(httpx.MockTransport(down)).warm_up() == []
+
+    def missing_chat_model(req):
+        return httpx.Response(404 if req.url.path == "/api/generate" else 200, json={})
+
+    assert Ollama(httpx.MockTransport(missing_chat_model)).warm_up() == ["embeddinggemma"]

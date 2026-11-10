@@ -211,3 +211,30 @@ def test_focused_quote_drops_list_syntax_and_origin_uses_inner_sections():
     for fragment in quote.split(" … "):
         for unit in re.split(r"(?<=\.)\s+", fragment.strip(" …")):
             assert unit in content
+
+
+def test_documents_that_declare_themselves_replaced_are_flagged_and_new_ones_are_not(api):
+    from uuid import uuid4
+
+    from app import main, rag
+
+    def upload(name, text):
+        response = api.post("/api/documents", files={"file": (name, text.encode(), "text/plain")})
+        assert response.status_code == 200, response.text
+        return response.json()["id"]
+
+    old = upload(
+        "old.txt", "Política 2023. Documento sustituido por la versión 2025. Hasta 3 días."
+    )
+    new = upload(
+        "new.txt", "Política 2025. Esta versión sustituye a la versión de 2023. Hasta 2 días."
+    )
+    plain = upload("plain.txt", "Los equipos obsoletos se entregan a mantenimiento.")
+    workspace = api.get("/api/auth/me").json()["workspace_id"]
+    sources = [{"document_id": d} for d in (old, new, plain)]
+    with main.get_conn() as conn:
+        marked = rag.mark_superseded(conn, workspace, sources)
+        assert [s["superseded"] for s in marked] == [True, False, False]
+        # Another workspace's documents are never flagged through this workspace's query.
+        assert not rag.mark_superseded(conn, str(uuid4()), [{"document_id": old}])[0]["superseded"]
+        assert rag.mark_superseded(conn, workspace, []) == []

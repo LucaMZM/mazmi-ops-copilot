@@ -16,6 +16,7 @@ def isolated_local_settings(monkeypatch):
     monkeypatch.setattr(settings, "embedding_dimensions", 1536)
     monkeypatch.setattr(settings, "evidence_mode", "passage_ids_v5")
     monkeypatch.setattr(settings, "chat_max_concurrent", 2)
+    monkeypatch.setattr(settings, "ollama_warmup", False)
     monkeypatch.setattr(settings, "ollama_reasoning", "on")
     monkeypatch.setattr(rag, "embedding_revision", lambda: "test-digest")
 

@@ -190,6 +190,35 @@ def prepare_query(query: str) -> tuple[str, Vector]:
     return collection, vector
 
 
+# A document that says it was replaced is not a current source (see evidence.visible_passages).
+# PostgreSQL ARE, case-insensitive. Deliberately narrow: "sustituye a la versión de 2023" in a
+# NEW policy must not mark that new policy as obsolete.
+SUPERSEDED_SQL = (
+    r"(sustituid[oa] por|reemplazad[oa] por|derogad[oa]|ya no est[aá] en vigor|"
+    r"no est[aá] en vigor|versi[oó]n obsoleta|documento obsoleto|solo como hist[oó]rico)"
+)
+
+
+def mark_superseded(conn, workspace_id: str, sources: list[dict]) -> list[dict]:
+    """Flag every source whose document text declares itself replaced or no longer in force."""
+    ids = sorted({s["document_id"] for s in sources})
+    flagged = (
+        {
+            str(row[0])
+            for row in conn.execute(
+                "SELECT DISTINCT document_id FROM document_chunks"
+                " WHERE workspace_id=%s AND document_id = ANY(%s::uuid[]) AND content ~* %s",
+                (workspace_id, ids, SUPERSEDED_SQL),
+            ).fetchall()
+        }
+        if ids
+        else set()
+    )
+    for source in sources:
+        source["superseded"] = source["document_id"] in flagged
+    return sources
+
+
 def retrieve(
     conn,
     workspace_id: str,
