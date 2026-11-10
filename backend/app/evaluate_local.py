@@ -11,7 +11,10 @@ import os
 import re
 import secrets
 import statistics
+import subprocess
+import threading
 import time
+import unicodedata
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -88,16 +91,102 @@ def load_cases(path=EVALS / "local_cases.json"):
     dataset = json.loads(Path(path).read_text())
     documents, questions = dataset["documents"], dataset["questions"]
     filenames = [document["filename"] for document in documents]
-    if len(documents) != 4 or len(questions) != 8 or len(set(filenames)) != 4:
-        raise ValueError("Expected four unique documents and eight questions")
-    if len({case["name"] for case in questions}) != 8:
+    if not documents or not questions or len(set(filenames)) != len(filenames):
+        raise ValueError("Expected unique fixture documents and at least one question")
+    if len({case["name"] for case in questions}) != len(questions):
         raise ValueError("Evaluation case names must be unique")
     for case in questions:
         if not set(case["expected_documents"]).issubset(filenames):
             raise ValueError("Unknown expected fixture document")
         if case["expected_abstention"] != (not case["expected_documents"]):
             raise ValueError("Abstention and source expectations disagree")
+        terms = case.get("expected_answer_terms", [])
+        if not isinstance(terms, list) or (terms and case["expected_abstention"]):
+            raise ValueError("Answer terms are only valid for answerable cases")
+    dataset["path"] = Path(path).name
     return dataset
+
+
+def _fold(text):
+    """Case/accent/space-insensitive form used only to compare expected terms."""
+    text = unicodedata.normalize("NFKD", text.casefold())
+    return " ".join("".join(c for c in text if not unicodedata.combining(c)).split())
+
+
+QUOTE = re.compile(r"«(.+?)»\s*\[(\d+)\]", re.S)
+
+
+def literal_quotes(answer, contents):
+    """Every «quoted» span must be a literal substring of the source it cites.
+
+    ``contents`` maps citation number -> stored chunk text. Omission marks (…) split a
+    quote into separately verified pieces; whitespace runs are compared collapsed.
+    Returns (quote_count, all_verified).
+    """
+    count, verified = 0, True
+    for quoted, ref in QUOTE.findall(answer):
+        count += 1
+        source = " ".join(contents.get(int(ref), "").split())
+        quoted = re.sub(r"〔(\d+)〕", r"[\1]", quoted)
+        for piece in (p.strip() for p in quoted.split("…")):
+            if piece and " ".join(piece.split()) not in source:
+                verified = False
+    return count, verified
+
+
+class MemorySampler:
+    """Peak resident memory of local Ollama processes and of loaded models.
+
+    Reads only ``ps`` RSS figures and Ollama's /api/ps sizes; no prompts or content.
+    """
+
+    def __init__(self, base_url, interval=0.5):
+        self.base_url, self.interval = base_url, interval
+        self.peak_rss_mb = 0.0
+        self.peak_loaded_bytes = 0
+        self._stop = threading.Event()
+        self._thread = None
+
+    def _rss_mb(self):
+        try:
+            out = subprocess.run(
+                ["ps", "-axo", "rss=,comm="], capture_output=True, text=True, timeout=5
+            ).stdout
+        except (OSError, subprocess.SubprocessError):
+            return 0.0
+        return (
+            sum(
+                int(line.split(None, 1)[0])
+                for line in out.splitlines()
+                if line.strip() and "ollama" in line.split(None, 1)[-1].lower()
+            )
+            / 1024
+        )
+
+    def _loaded(self):
+        import httpx
+
+        try:
+            models = httpx.get(self.base_url + "/api/ps", timeout=2, trust_env=False).json()
+            return sum(int(m.get("size", 0)) for m in models.get("models", []))
+        except (httpx.HTTPError, ValueError, TypeError, AttributeError):
+            return 0
+
+    def _run(self):
+        while not self._stop.is_set():
+            self.peak_rss_mb = max(self.peak_rss_mb, self._rss_mb())
+            self.peak_loaded_bytes = max(self.peak_loaded_bytes, self._loaded())
+            self._stop.wait(self.interval)
+
+    def __enter__(self):
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._stop.set()
+        self._thread.join(timeout=5)
+        return False
 
 
 def source_metrics(expected_documents, retrieved, cited):
@@ -135,14 +224,32 @@ def classify_case(case):
     if "http_status" in case:
         return case.get("classification", "technical_error")
     if case.get("abstention_reason") in {
-        "incomplete_evidence_assessment", "invalid_evidence_assessment", "invalid_evidence_selection",
+        "incomplete_evidence_assessment",
+        "invalid_evidence_assessment",
+        "invalid_evidence_selection",
     }:
         return "technical_error"
     if case["abstained"]:
         return "correct_abstention" if case["expected_abstention"] else "false_abstention"
     if case["expected_abstention"] or not case.get("all_expected_documents_cited", False):
         return "unsupported_answer"
+    if case.get("literal_quotes_verified") is False:
+        return "unsupported_answer"
+    if case.get("answer_terms_present") is False:
+        return "incomplete_answer"
     return "correct"
+
+
+def _latency(values):
+    if not values:
+        return None
+    ordered = sorted(values)
+    return {
+        "p50": round(statistics.median(ordered), 1),
+        "p95": round(ordered[min(len(ordered) - 1, round(0.95 * (len(ordered) - 1)))], 1),
+        "max": round(ordered[-1], 1),
+        "total_s": round(sum(ordered) / 1000, 1),
+    }
 
 
 def summarize(results):
@@ -158,16 +265,26 @@ def summarize(results):
         "completed_answerable_cases": len(positives),
         "completed_unanswerable_cases": len(negatives),
         "retrieval_measured_answerable_cases": len(positives),
-        "correct_abstentions": sum(classify_case(case) == "correct_abstention" for case in negatives),
+        "correct_abstentions": sum(
+            classify_case(case) == "correct_abstention" for case in negatives
+        ),
         "false_abstentions": sum(case["abstained"] for case in positives),
         "unanswered_answerable_cases": sum(
-            not case["expected_abstention"] and ("http_status" in case or case.get("abstained", False))
+            not case["expected_abstention"]
+            and ("http_status" in case or case.get("abstained", False))
             for case in results
         ),
         "classification_counts": {
             label: sum(classify_case(case) == label for case in results)
-            for label in ("correct", "correct_abstention", "false_abstention",
-                          "unsupported_answer", "timeout", "technical_error")
+            for label in (
+                "correct",
+                "correct_abstention",
+                "false_abstention",
+                "incomplete_answer",
+                "unsupported_answer",
+                "timeout",
+                "technical_error",
+            )
         },
         "mean_document_recall_at_6": statistics.mean(
             case["document_recall_at_6"] for case in positives
@@ -183,6 +300,23 @@ def summarize(results):
         "all_returned_citation_ids_valid": all(case["citation_ids_valid"] for case in complete)
         if complete
         else None,
+        "all_quotes_literal": all(case.get("literal_quotes_verified", True) for case in complete)
+        if complete
+        else None,
+        "answerable_cases_with_expected_terms": sum(
+            case.get("answer_terms_present") is not False
+            for case in positives
+            if not case["abstained"]
+        ),
+        "chat_latency_ms": _latency(
+            [case["duration_ms"] for case in results if "duration_ms" in case]
+        ),
+        "peak_ollama_rss_mb": max(
+            (case.get("peak_ollama_rss_mb", 0) for case in results), default=0
+        ),
+        "peak_loaded_model_mb": max(
+            (case.get("peak_loaded_model_mb", 0) for case in results), default=0
+        ),
         "mean_retrieval_ms_including_embedding": statistics.mean(
             case["retrieval_ms"] for case in complete
         )
@@ -191,13 +325,13 @@ def summarize(results):
     }
 
 
-def run(*, credentials_file=None):
+def run(*, credentials_file=None, cases_path=None):
     from fastapi.testclient import TestClient
 
     from .config import settings
 
     database = guard_configuration(settings)
-    dataset = load_cases()
+    dataset = load_cases(cases_path or EVALS / "local_cases.json")
     # Do not print settings, connection strings, provider exceptions or HTTP bodies.
     with psycopg.connect(settings.database_url, autocommit=True, connect_timeout=10) as guard:
         if guard.execute("SELECT current_database()").fetchone()[0] != database:
@@ -265,19 +399,29 @@ def run(*, credentials_file=None):
                         "duration_ms": round((time.perf_counter() - started) * 1000, 2),
                     }
                 )
-            checks["all_four_documents_indexed"] = all(item["ready"] for item in ingestion)
+            checks["all_documents_indexed"] = all(item["ready"] for item in ingestion)
             for case in dataset["questions"]:
                 started = time.perf_counter()
-                response = api.post("/api/chat", json={"message": case["question"], "mode": "ASK"})
+                with MemorySampler(settings.ollama_base_url) as memory:
+                    response = api.post(
+                        "/api/chat", json={"message": case["question"], "mode": "ASK"}
+                    )
                 result = {
                     "name": case["name"],
                     "expected_abstention": case["expected_abstention"],
                     "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+                    "peak_ollama_rss_mb": round(memory.peak_rss_mb, 1),
+                    "peak_loaded_model_mb": round(memory.peak_loaded_bytes / 2**20, 1),
                 }
                 if response.status_code != 200:
                     timeout = response.status_code == 503 and "agotó el tiempo" in response.text
-                    results.append({**result, "http_status": response.status_code,
-                                    "classification": "timeout" if timeout else "technical_error"})
+                    results.append(
+                        {
+                            **result,
+                            "http_status": response.status_code,
+                            "classification": "timeout" if timeout else "technical_error",
+                        }
+                    )
                     continue
                 body = response.json()
                 with get_conn() as conn:
@@ -287,6 +431,14 @@ def run(*, credentials_file=None):
                         (workspace, body["conversation_id"]),
                     ).fetchone()
                     meta = row[0]
+                    contents = {
+                        number: chunk[0]
+                        for number, source in enumerate(body["sources"], 1)
+                        for chunk in conn.execute(
+                            "SELECT content FROM document_chunks WHERE id=%s AND workspace_id=%s",
+                            (source["chunk_id"], workspace),
+                        ).fetchall()
+                    }
                     valid_chunks = {
                         (chunk[0], str(chunk[1]), chunk[2], chunk[3])
                         for chunk in conn.execute(
@@ -326,6 +478,13 @@ def run(*, credentials_file=None):
                         ),
                     }
                 )
+                quote_count, quotes_ok = literal_quotes(body["answer"], contents)
+                result["quote_count"] = quote_count
+                result["literal_quotes_verified"] = quotes_ok
+                terms = case.get("expected_answer_terms", [])
+                if terms and not result["abstained"]:
+                    answer = _fold(body["answer"])
+                    result["answer_terms_present"] = all(_fold(t) in answer for t in terms)
                 result["classification"] = classify_case(result)
                 results.append(result)
             checks["ask_never_mutated"] = not request("GET", "/api/actions") and not request(
@@ -367,7 +526,9 @@ def run(*, credentials_file=None):
             "embedding_model": settings.embedding_model,
             "embedding_dimensions": settings.vector_dimensions,
             "embedding_collection": collection,
-            "fixtures": "local_cases.json; four fictitious documents / eight questions",
+            "fixtures": f"{dataset['path']}; {len(dataset['documents'])} fictitious documents / "
+            f"{len(dataset['questions'])} questions",
+            "ollama_reasoning": settings.ollama_reasoning,
             "ingestion": ingestion,
             "cases": results,
             "summary": summarize(results),
@@ -377,7 +538,9 @@ def run(*, credentials_file=None):
                 "Gold document coverage and citation validity do not prove semantic entailment or full answer correctness.",
                 "Abstention labels are controlled fixture expectations, not general model accuracy.",
                 "Recall/MRR are document-level on answerable fixtures, K=6 chunks; latency includes query embedding.",
-                "No baseline model comparison, no cloud provider, no mocks, no voice or browser timing measured.",
+                "Expected answer terms check literal facts, not full semantic correctness.",
+                "Memory is Ollama process RSS and Ollama-reported model size, sampled every 0.5 s.",
+                "No cloud provider, no mocks, no voice or browser timing measured.",
                 "Only newly created fictitious records are used; database retained, never reset or cleaned automatically.",
             ],
         }
@@ -476,12 +639,14 @@ def journey(api, request, get_conn, app, headers, workspace, checks):
 def fixture_checks_passed(report):
     summary = report["summary"]
     return (
-        summary["completed_questions"] == 8
+        summary["completed_questions"] == summary["attempted_questions"]
         and summary["http_errors"] == 0
-        and summary["correct_abstentions"] == summary["unanswerable_cases"] == 4
+        and summary["correct_abstentions"] == summary["unanswerable_cases"]
         and summary["false_abstentions"] == 0
-        and summary["answerable_cases_with_all_gold_documents_cited"] == 4
+        and summary["answerable_cases_with_all_gold_documents_cited"] == summary["answerable_cases"]
         and summary["all_returned_citation_ids_valid"] is True
+        and summary["all_quotes_literal"] is True
+        and summary["classification_counts"]["incomplete_answer"] == 0
         and all(report["journey_checks"].values())
     )
 
@@ -492,6 +657,9 @@ def main():
         "--live", action="store_true", help="Required consent to use installed Ollama models"
     )
     parser.add_argument("--output", type=Path, required=True, help="Public sanitized JSON result")
+    parser.add_argument(
+        "--cases", type=Path, default=EVALS / "local_cases.json", help="Fixture dataset JSON"
+    )
     parser.add_argument(
         "--credentials-file",
         type=Path,
@@ -504,7 +672,7 @@ def main():
     try:
         if args.credentials_file:
             credentials = prepare_credentials_file(args.credentials_file)
-        report = run(credentials_file=credentials)
+        report = run(credentials_file=credentials, cases_path=args.cases)
         report["automated_fixture_checks_passed"] = fixture_checks_passed(report)
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
         print(
