@@ -64,6 +64,41 @@ def test_committed_dataset_is_four_docs_eight_cases():
     assert sum(q["expected_abstention"] for q in data["questions"]) == 4
 
 
+def test_holdout_dataset_is_separate_and_checks_answer_terms():
+    data = evaluation.load_cases(evaluation.EVALS / "local_holdout_v3.json")
+    original = evaluation.load_cases()
+    assert not {q["question"] for q in data["questions"]} & {
+        q["question"] for q in original["questions"]
+    }
+    answerable = [q for q in data["questions"] if not q["expected_abstention"]]
+    assert answerable and all(q["expected_answer_terms"] for q in answerable)
+
+
+def test_literal_quotes_must_exist_in_the_cited_source():
+    contents = {1: "Las compras  hasta 250 euros requieren aprobación. Código [7].", 2: "Otro."}
+    ok = "Según a.txt:\n«Las compras hasta 250 euros requieren aprobación. … Código 〔7〕.» [1]"
+    assert evaluation.literal_quotes(ok, contents) == (1, True)
+    invented = "«Las compras hasta 300 euros requieren aprobación.» [1]"
+    assert evaluation.literal_quotes(invented, contents) == (1, False)
+    wrong_source = "«Las compras hasta 250 euros requieren aprobación.» [2]"
+    assert evaluation.literal_quotes(wrong_source, contents) == (1, False)
+
+
+def test_answers_missing_expected_terms_are_not_counted_as_correct():
+    case = {
+        "expected_abstention": False,
+        "abstained": False,
+        "all_expected_documents_cited": True,
+        "literal_quotes_verified": True,
+        "answer_terms_present": False,
+    }
+    assert evaluation.classify_case(case) == "incomplete_answer"
+    case["answer_terms_present"] = True
+    assert evaluation.classify_case(case) == "correct"
+    case["literal_quotes_verified"] = False
+    assert evaluation.classify_case(case) == "unsupported_answer"
+
+
 def test_credentials_are_private_new_and_outside_worktrees(tmp_path, monkeypatch):
     repo = tmp_path / "repository"
     repo.mkdir()
@@ -100,15 +135,30 @@ def test_failed_questions_cannot_disappear_from_summary_or_gate():
     )
 
 
-@pytest.mark.parametrize("case,expected", [
-    ({"http_status": 503, "classification": "timeout"}, "timeout"),
-    ({"expected_abstention": True, "abstained": True,
-      "abstention_reason": "incomplete_evidence_assessment"}, "technical_error"),
-    ({"expected_abstention": True, "abstained": True}, "correct_abstention"),
-    ({"expected_abstention": False, "abstained": True}, "false_abstention"),
-    ({"expected_abstention": False, "abstained": False,
-      "all_expected_documents_cited": False}, "unsupported_answer"),
-])
+@pytest.mark.parametrize(
+    "case,expected",
+    [
+        ({"http_status": 503, "classification": "timeout"}, "timeout"),
+        (
+            {
+                "expected_abstention": True,
+                "abstained": True,
+                "abstention_reason": "incomplete_evidence_assessment",
+            },
+            "technical_error",
+        ),
+        ({"expected_abstention": True, "abstained": True}, "correct_abstention"),
+        ({"expected_abstention": False, "abstained": True}, "false_abstention"),
+        (
+            {
+                "expected_abstention": False,
+                "abstained": False,
+                "all_expected_documents_cited": False,
+            },
+            "unsupported_answer",
+        ),
+    ],
+)
 def test_case_classification_does_not_count_failure_as_correct_abstention(case, expected):
     assert evaluation.classify_case(case) == expected
 
