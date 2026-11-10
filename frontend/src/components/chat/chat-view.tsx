@@ -7,11 +7,7 @@ import type { Message, Mode, PendingAction, Source, SystemInfo } from "../produc
 import type { Draft } from "@/hooks/use-chat";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 
-const STARTERS = [
-  "¿Cuántos días de vacaciones hay?",
-  "¿Qué información hay sobre el acceso?",
-  "Consulta mis tickets",
-];
+const STARTERS = ["¿Qué dice la documentación sobre ", "Lista los tickets del workspace"];
 
 type Props = {
   system: SystemInfo | null;
@@ -58,7 +54,6 @@ export const ChatView = forwardRef<ComposerHandle, Props>(function ChatView(
     end,
     `${messages.length}:${draft?.text.length ?? -1}:${draft?.status ?? ""}:${loadingHistory}`,
   );
-  const demo = !!system?.demo;
   const streaming = draft !== null;
 
   return (
@@ -93,11 +88,10 @@ export const ChatView = forwardRef<ComposerHandle, Props>(function ChatView(
                   </button>
                 ))}
               </div>
-              {system?.generation.state === "not_configured" && (
+              {system?.generation.verification === "failed" && (
                 <p className="setupHint">
-                  El proveedor seleccionado todavía no está configurado. Las lecturas exactas de
-                  tickets funcionan igualmente; para preguntas documentales revisa Configuración
-                  o utiliza la demo de desarrollo.
+                  La última prueba de Ollama falló. Las lecturas exactas de tickets funcionan sin
+                  modelo; para preguntas documentales inicia Ollama y revisa Configuración.
                 </p>
               )}
             </section>
@@ -111,13 +105,12 @@ export const ChatView = forwardRef<ComposerHandle, Props>(function ChatView(
             <MessageItem
               key={m.id}
               message={m}
-              demo={demo}
               deciding={deciding}
               onSource={onSource}
               onDecide={onDecide}
             />
           ))}
-          {draft && <DraftMessage draft={draft} demo={demo} />}
+          {draft && <DraftMessage draft={draft} />}
           <div ref={end} className="scrollAnchor" />
         </div>
       </div>

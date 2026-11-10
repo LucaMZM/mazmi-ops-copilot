@@ -5,29 +5,36 @@ import { Copilot } from "../src/components/copilot";
 import { AnswerText, Inspector } from "../src/components/product-ui";
 import type { SystemInfo } from "../src/components/product-types";
 const account = {
-  email: "demo@test.local",
+  email: "ana@test.local",
   workspace_id: "one",
   workspaces: [
     { id: "one", name: "Operaciones" },
     { id: "two", name: "Laboratorio" },
   ],
 };
+const runtime: SystemInfo["runtime"] = {
+  local_endpoint: true,
+  reasoning: "off",
+  context_tokens: 4096,
+  timeout_seconds: 120,
+  keep_alive: "5m",
+  max_concurrent_turns: 1,
+  evidence_mode: "quoted_v6",
+};
 const system: SystemInfo = {
-  demo: false,
   generation: {
-    provider: "gemini",
-    model: "gemini-test",
-    state: "not_configured",
+    provider: "ollama",
+    model: "qwen-test",
     verification: "not_checked",
   },
   embeddings: {
-    provider: "gemini",
+    provider: "ollama",
     model: "embedding-test",
-    state: "not_configured",
     verification: "not_checked",
     dimensions: 768,
-    collection: "gemini:test:768:v1",
+    collection: "ollama:test:768:v1",
   },
+  runtime,
   voice: {
     stt: "faster-whisper",
     tts: "piper",
@@ -68,7 +75,7 @@ const docs = [
     mime_type: "text/plain",
     error: null,
     embedding_model: "old-model",
-    embedding_collection: "openai:old:1536",
+    embedding_collection: "ollama:old:1536",
     embedding_dimensions: 1536,
   },
   {
@@ -138,27 +145,28 @@ test("knowledge searches filenames and filters incompatible and failed documents
   });
   expect(screen.getByText("Sin coincidencias")).toBeInTheDocument();
 });
-test("settings distinguish missing config from real verification", async () => {
+test("settings describe the local engine and never claim a verified connection", async () => {
   mockBase();
   mount();
   nav("Configuración");
-  await screen.findByText("gemini-test");
-  expect(screen.getAllByText("No configurado").length).toBeGreaterThan(1);
+  await screen.findByText("qwen-test");
+  expect(screen.getAllByText("Ollama (local)")).toHaveLength(2);
   expect(screen.getAllByText("No verificada")).toHaveLength(2);
+  expect(screen.getByText(/Razonamiento desactivado/)).toBeInTheDocument();
+  expect(screen.getByText("Citas literales verificadas por el servidor")).toBeInTheDocument();
+  expect(screen.getByText("En este equipo")).toBeInTheDocument();
   expect(screen.queryByText(/Conectado/)).not.toBeInTheDocument();
-  expect(screen.getByText("gemini:test:768:v1")).toBeInTheDocument();
+  expect(screen.getByText("ollama:test:768:v1")).toBeInTheDocument();
 });
-test("demo state is clearly labeled without claiming a Gemini connection", async () => {
-  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
-    Response.json(
-      String(input) === "/api/system" ? { ...system, demo: true } : [],
-    ),
-  );
+test("the interface carries no demo, simulation or cloud-provider labels", async () => {
+  mockBase();
   mount();
-  await screen.findByText("Demo de desarrollo");
-  expect(
-    screen.getByText(/IA simulada · Sin conexión con Gemini/),
-  ).toBeInTheDocument();
+  nav("Configuración");
+  await screen.findByText("qwen-test");
+  for (const view of ["Configuración", "Copilot"]) {
+    nav(view);
+    expect(document.body.textContent).not.toMatch(/demo|simulad|Gemini|OpenAI|API key/i);
+  }
 });
 test("document inspector calls scoped chunk endpoint and supports keyboard dismissal", async () => {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
@@ -207,7 +215,7 @@ test("activity omits private prompts and arbitrary details", async () => {
             {
               id: 1,
               type: "action.executed",
-              actor: "demo@test.local",
+              actor: "ana@test.local",
               created_at: "2026-10-20T12:00:00Z",
               details: {
                 ticket_id: 7,
@@ -274,13 +282,13 @@ test("inspector traps focus and returns to trigger when closed", () => {
   expect(button).toHaveFocus();
   button.remove();
 });
-test("missing provider error preserves the draft for retry", async () => {
+test("unreachable Ollama error preserves the draft for retry", async () => {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
     String(input).includes("/stream")
       ? Response.json(
           {
             detail:
-              "Gemini seleccionado: configura GEMINI_API_KEY solo en el servidor.",
+              "No se puede conectar con Ollama. Inicia el servicio local.",
           },
           { status: 503 },
         )
@@ -462,13 +470,11 @@ const ollamaSystem: SystemInfo = {
   generation: {
     provider: "ollama",
     model: "qwen3:4b",
-    state: "configured",
     verification: "not_checked",
   },
   embeddings: {
     provider: "ollama",
     model: "embeddinggemma",
-    state: "configured",
     verification: "not_checked",
     dimensions: 768,
     collection: null,
@@ -515,25 +521,20 @@ test("Ollama verification is manual, single-flight and does not block the chat",
   expect(fetcher.mock.calls.find(([url]) => String(url).endsWith("/check-local"))?.[1]?.method).toBe("POST");
   nav("Copilot");
   expect(screen.getByLabelText("Mensaje al copiloto")).toBeEnabled();
-  expect(screen.getByLabelText("Proveedor de la consulta")).toHaveTextContent("Ollama · seleccionado, sin verificar");
+  expect(screen.getByLabelText("Modelo local de la consulta")).toHaveTextContent("Ollama local · sin verificar");
   complete(Response.json(checkedOllama));
-  await waitFor(() => expect(screen.getByLabelText("Proveedor de la consulta")).toHaveTextContent("última prueba local completada"));
-  expect(screen.getByLabelText("Proveedor de la consulta").querySelector("time")).toHaveAttribute("datetime", "2026-10-22T12:00:00Z");
+  await waitFor(() => expect(screen.getByLabelText("Modelo local de la consulta")).toHaveTextContent("última prueba completada"));
+  expect(screen.getByLabelText("Modelo local de la consulta").querySelector("time")).toHaveAttribute("datetime", "2026-10-22T12:00:00Z");
   expect(screen.queryByText(/Conectado/)).not.toBeInTheDocument();
 });
 
-test.each<[string, SystemInfo]>([
-  ["Gemini", system],
-  ["demo", { ...ollamaSystem, demo: true }],
-  ["mixed providers", { ...ollamaSystem, embeddings: system.embeddings }],
-])("%s never offers or runs a local Ollama probe", async (_label, config) => {
+test("opening settings never runs the Ollama probe by itself", async () => {
   const fetcher = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
-    Response.json(String(input) === "/api/system" ? config : fetchBase(String(input))),
+    Response.json(String(input) === "/api/system" ? ollamaSystem : fetchBase(String(input))),
   );
   mount();
   nav("Configuración");
-  await screen.findByText(config.generation.model);
-  expect(screen.queryByRole("button", { name: "Verificar Ollama" })).not.toBeInTheDocument();
+  await screen.findByRole("button", { name: "Verificar Ollama" });
   expect(fetcher.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
 });
 
@@ -570,7 +571,7 @@ test("a completed negative fixture check displays failure and no verified collec
   expect(screen.getAllByText("Última prueba local fallida")).toHaveLength(2);
   expect(screen.getByText("Pendiente de verificar el digest Ollama")).toBeInTheDocument();
   nav("Copilot");
-  expect(screen.getByLabelText("Proveedor de la consulta")).toHaveTextContent("Ollama · última prueba local fallida");
+  expect(screen.getByLabelText("Modelo local de la consulta")).toHaveTextContent("Ollama local · última prueba fallida");
 });
 
 test("a stale local result cannot overwrite a freshly loaded provider configuration", async () => {
@@ -584,24 +585,14 @@ test("a stale local result cannot overwrite a freshly loaded provider configurat
   mount();
   nav("Configuración");
   fireEvent.click(await screen.findByRole("button", { name: "Verificar Ollama" }));
-  config = system;
+  config = { ...system, generation: { ...system.generation, model: "qwen-other" } };
   fireEvent.click(screen.getByRole("button", { name: "Actualizar estado" }));
-  await screen.findByText("gemini-test");
+  await screen.findByText("qwen-other");
   complete(Response.json(checkedOllama));
   await waitFor(() => expect(screen.queryByText("qwen3:4b")).not.toBeInTheDocument());
   nav("Copilot");
-  expect(screen.getByLabelText("Proveedor de la consulta")).toHaveTextContent("Gemini · sin API key configurada");
-});
-
-test("demo chat labels simulation rather than a real local model", async () => {
-  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
-    Response.json(String(input) === "/api/system" ? { ...ollamaSystem, demo: true } : fetchBase(String(input))),
-  );
-  mount();
-  await screen.findByText("Demo de desarrollo");
-  nav("Copilot");
-  expect(screen.getByLabelText("Proveedor de la consulta")).toHaveTextContent("DEMO · IA simulada");
-  expect(screen.getByLabelText("Proveedor de la consulta")).not.toHaveTextContent("prueba local completada");
+  expect(screen.getByLabelText("Modelo local de la consulta")).toHaveTextContent("Ollama local · sin verificar");
+  expect(screen.getByLabelText("Modelo local de la consulta")).not.toHaveTextContent("completada");
 });
 
 test("local verification timeout does not retry and explains that the backend may continue", async () => {
