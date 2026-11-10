@@ -8,20 +8,12 @@ from pathlib import Path
 from threading import Lock
 
 from .config import settings
-from .providers import ProviderUnavailable, openai_client
+from .providers import ProviderUnavailable
 
 speech_lock = Lock()
 
 
 def synthesize(text):
-    if settings.tts_provider == "openai":
-        audio = openai_client().audio.speech.create(
-            model=settings.openai_tts_model,
-            voice=settings.openai_tts_voice,
-            input=text,
-            response_format="mp3",
-        )
-        return audio.read(), "audio/mpeg"
     model = Path(settings.piper_model_path)
     if not model.is_file() or not Path(str(model) + ".json").is_file():
         raise ProviderUnavailable(

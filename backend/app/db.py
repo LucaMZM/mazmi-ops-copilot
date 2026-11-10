@@ -96,10 +96,3 @@ def get_conn():
         raise
     else:
         context.__exit__(None, None, None)
-
-
-def get_demo_workspace_id(conn) -> str:
-    row = conn.execute("SELECT id FROM workspaces WHERE slug = %s", ("mazmi-demo",)).fetchone()
-    if not row:
-        raise RuntimeError("Demo workspace is missing")
-    return str(row[0])

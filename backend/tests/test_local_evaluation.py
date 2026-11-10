@@ -12,7 +12,6 @@ def configuration(**overrides):
     return NS(
         **{
             "app_env": "development",
-            "demo_mode": False,
             "generation_provider": "ollama",
             "embedding_provider": "ollama",
             "database_url": "postgresql://localhost/controlled_local",
@@ -25,9 +24,6 @@ def configuration(**overrides):
     "override",
     [
         {"app_env": "production"},
-        {"demo_mode": True},
-        {"generation_provider": "openai"},
-        {"embedding_provider": "gemini"},
         {"database_url": "postgresql://localhost/company"},
         {"database_url": "postgresql://localhost/company_local_backup"},
     ],

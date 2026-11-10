@@ -63,7 +63,6 @@ def _inventory(client):
 
 
 def run_checks(client=None, *, full=True, check_names=None):
-    _require(not settings.demo_mode, "DEMO_MODE must be false: this check requires real Ollama")
     _require(
         settings.generation_provider == settings.embedding_provider == "ollama",
         "This smoke check only permits Ollama providers",

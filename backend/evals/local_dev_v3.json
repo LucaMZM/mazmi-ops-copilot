@@ -1,0 +1,121 @@
+{
+  "purpose": "Fictitious development set used to iterate on the v6 evidence pipeline. Distinct from local_cases.json (original eight) and local_holdout_v3.json (reserved, never tuned against).",
+  "documents": [
+    {
+      "filename": "teletrabajo-ficticio.md",
+      "text": "# Teletrabajo de ejemplo\n\n## Días permitidos\n\n- El teletrabajo se permite hasta 2 días por semana.\n- Los lunes son presenciales para todo el equipo.\n\n## Equipamiento\n\nLa empresa entrega un portátil y una pantalla. El empleado paga su propia conexión a internet; no se reembolsa.\n"
+    },
+    {
+      "filename": "formacion-ficticia.txt",
+      "text": "Política de formación de ejemplo. Cada empleado dispone de 20 horas de formación al año. Los cursos de más de 500 euros requieren aprobación de Recursos Humanos. La solicitud se envía con el formulario FOR-21 al menos 15 días antes del inicio."
+    },
+    {
+      "filename": "residuos-ficticios.txt",
+      "text": "Gestión de residuos de ejemplo. El papel se deposita en el contenedor azul. Los tóneres usados se entregan al responsable de mantenimiento. Las pilas se recogen cada primer martes de mes. Está prohibido tirar aparatos eléctricos a la basura común."
+    }
+  ],
+  "questions": [
+    {
+      "name": "d_remote_days",
+      "question": "¿Cuántos días por semana se puede teletrabajar?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "teletrabajo-ficticio.md"
+      ],
+      "expected_answer_terms": [
+        "2 días"
+      ]
+    },
+    {
+      "name": "d_internet_refund",
+      "question": "¿La empresa reembolsa la conexión a internet de quien teletrabaja?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "teletrabajo-ficticio.md"
+      ],
+      "expected_answer_terms": [
+        "no se reembolsa"
+      ]
+    },
+    {
+      "name": "d_training_hours",
+      "question": "¿Cuántas horas de formación tiene cada empleado al año?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "formacion-ficticia.txt"
+      ],
+      "expected_answer_terms": [
+        "20 horas"
+      ]
+    },
+    {
+      "name": "d_training_request",
+      "question": "¿Qué formulario hay que usar para pedir un curso y con cuánta antelación?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "formacion-ficticia.txt"
+      ],
+      "expected_answer_terms": [
+        "FOR-21",
+        "15 días"
+      ]
+    },
+    {
+      "name": "d_battery_paraphrase",
+      "question": "¿Cuándo se recogen las baterías pequeñas (pilas)?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "residuos-ficticios.txt"
+      ],
+      "expected_answer_terms": [
+        "primer martes"
+      ]
+    },
+    {
+      "name": "d_toner",
+      "question": "¿A quién se entregan los tóneres usados?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "residuos-ficticios.txt"
+      ],
+      "expected_answer_terms": [
+        "responsable de mantenimiento"
+      ]
+    },
+    {
+      "name": "d_remote_salary_bonus",
+      "question": "¿Cuánto cobra de plus quien teletrabaja?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "d_training_deadline_approval",
+      "question": "¿Cuánto tarda Recursos Humanos en aprobar un curso?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "d_glass_container",
+      "question": "¿En qué contenedor se deposita el vidrio?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "d_laptop_brand",
+      "question": "¿Qué marca de portátil entrega la empresa?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "d_monitor_count",
+      "question": "¿Cuántas pantallas se entregan a cada empleado de teletrabajo?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "teletrabajo-ficticio.md"
+      ],
+      "expected_answer_terms": [
+        "una pantalla"
+      ]
+    }
+  ]
+}
