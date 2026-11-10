@@ -83,10 +83,42 @@ def verify_quote(quote, text, min_chars=12):
 
 
 def passages(sources):
-    return [
+    items = [
         {"id": i, "citation": citation, "text": source["content"]}
         for i, (citation, source) in enumerate(enumerate(sources, 1), 1)
     ]
+    for item, source in zip(items, sources, strict=True):
+        if source.get("superseded"):
+            item["estado"] = "sustituido"  # Only present when true: current is the default.
+    return items
+
+
+# "personal en el portátil" qualifies nothing: the word after the preposition is an article.
+DETERMINERS = {
+    "el",
+    "la",
+    "los",
+    "las",
+    "un",
+    "una",
+    "unos",
+    "unas",
+    "mi",
+    "tu",
+    "su",
+    "mis",
+    "tus",
+    "sus",
+    "nuestro",
+    "nuestra",
+    "este",
+    "esta",
+    "esa",
+    "ese",
+    "lo",
+    "al",
+    "del",
+}
 
 
 def is_identifier(word):
@@ -135,11 +167,15 @@ def missing_scope(question, content):
         if (i > 0 and w[0].isupper() and normalize(w) not in ignored) or is_identifier(w)
     ]
     required += re.findall(r'["“]([^"”]+)["”]', question)
-    required += re.findall(
-        r"(?:empleados|personal|equipo|oficina|sede|contratistas)\s+(?:de|en)\s+([\w-]+)",
-        question,
-        re.I,
-    )
+    required += [
+        w
+        for w in re.findall(
+            r"(?:empleados|personal|equipo|oficina|sede|contratistas)\s+(?:de|en)\s+([\w-]+)",
+            question,
+            re.I,
+        )
+        if normalize(w) not in DETERMINERS
+    ]
     available = normalize(content)
     return any(
         not re.search(r"(?<!\w)" + re.escape(normalize(w)) + r"(?!\w)", available) for w in required
@@ -644,6 +680,8 @@ SELECT_INSTRUCTIONS = (
     'Si el status no es "sufficient", evidence va vacío.\n'
     'Ejemplo: pregunta "¿Cuánto cuesta la entrada infantil?" y único pasaje "La entrada general '
     'cuesta 8 euros." => insufficient, porque el pasaje no menciona la entrada infantil.\n'
+    'Un pasaje con "estado": "sustituido" es una versión antigua: úsalo solo si la pregunta es '
+    "sobre esa versión y no mezcles sus datos con los de la versión vigente.\n"
     "Responde solo con el JSON."
 )
 
@@ -657,7 +695,10 @@ CHECK_INSTRUCTIONS = (
     'Un singular o un artículo indefinido ("una pantalla") expresa la cantidad 1. El campo '
     '"source" (archivo y sección) indica de qué trata cada cita y puede completar la entidad.\n'
     '3. "answers" es false cuando el dato pedido no aparece, cuando las citas solo hablan del '
-    "mismo tema sin ese dato, o cuando se refieren a otra entidad.\n"
+    "mismo tema sin ese dato, o cuando se refieren a otra entidad. Fíjate en las partes: si la "
+    "pregunta es sobre una parte (cliente, empleado, proveedor) y la cita trata de otra, es "
+    "false. Si el origen indica que el documento está sustituido y la pregunta es sobre esa "
+    "versión antigua, la cita es válida.\n"
     '4. En "answer" copia de las citas lo que responde, o "" si answers es false.\n'
     "Responde solo con el JSON."
 )
