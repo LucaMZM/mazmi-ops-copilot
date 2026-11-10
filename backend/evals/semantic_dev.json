@@ -1,0 +1,364 @@
+[
+ {
+  "name": "d_role_carrier_vs_customer",
+  "question": "¿Cuánto cuesta el envío estándar a un cliente?",
+  "texts": [
+   "Contrato con el transportista. La tarifa que el transportista factura a la empresa es de 4,80 euros por bulto."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "role_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_role_carrier_ok",
+  "question": "¿Cuánto cobra el transportista a la empresa por bulto?",
+  "texts": [
+   "Contrato con el transportista. La tarifa que el transportista factura a la empresa es de 4,80 euros por bulto."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "role_match",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_role_supplier_vs_employee",
+  "question": "¿Qué descuento tienen los empleados en la tienda?",
+  "texts": [
+   "Los proveedores homologados aplican a la empresa un descuento del 12 % por volumen."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "role_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_role_manager_vs_intern",
+  "question": "¿Cuántos días de vacaciones tienen los becarios?",
+  "texts": [
+   "Los directores de área disponen de 27 días laborables de vacaciones al año."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "role_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_role_intern_ok",
+  "question": "¿Cuántos días de vacaciones tienen los becarios?",
+  "texts": [
+   "Los directores de área disponen de 27 días laborables de vacaciones al año.",
+   "Los becarios disponen de 15 días laborables de vacaciones al año."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "role_match",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_role_tenant_vs_landlord",
+  "question": "¿Quién paga la reparación de la caldera, el inquilino?",
+  "texts": [
+   "El propietario asume el coste de las reparaciones de la caldera y de la instalación eléctrica."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "role_match_negative_answer",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_role_notice_employer",
+  "question": "¿Con cuánto preaviso puede la empresa cambiarme el turno?",
+  "texts": [
+   "El trabajador debe solicitar un cambio de turno con 7 días de antelación."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "role_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_role_notice_employee_ok",
+  "question": "¿Con cuánta antelación tengo que pedir un cambio de turno?",
+  "texts": [
+   "El trabajador debe solicitar un cambio de turno con 7 días de antelación."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "role_match",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_role_refund_to_supplier",
+  "question": "¿En cuántos días nos paga el cliente una factura?",
+  "texts": [
+   "La empresa paga las facturas de sus proveedores a 30 días desde la recepción."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "role_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_role_location",
+  "question": "¿A qué hora abre la oficina de Sevilla?",
+  "texts": [
+   "La oficina de Bilbao abre a las 8:00. La oficina de Sevilla cierra a las 18:00."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "attribute_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_role_location_ok",
+  "question": "¿A qué hora cierra la oficina de Sevilla?",
+  "texts": [
+   "La oficina de Bilbao abre a las 8:00. La oficina de Sevilla cierra a las 18:00."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "role_match",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_cond_parttime",
+  "question": "¿Cuántas horas de formación tiene el personal a tiempo parcial?",
+  "texts": [
+   "El personal a jornada completa dispone de 20 horas de formación al año."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "condition_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_cond_general_ok",
+  "question": "¿Cuántas horas de formación hay al año?",
+  "texts": [
+   "Todo el personal dispone de 20 horas de formación al año."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "condition_match",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_conf_days_words",
+  "question": "¿Cuántos días de vacaciones hay?",
+  "texts": [
+   "Las vacaciones anuales son 25 días laborables.",
+   "Cada persona dispone de treinta jornadas de descanso al año."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "paraphrased_conflict",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_conf_deadline",
+  "question": "¿En qué plazo hay que entregar el parte médico?",
+  "texts": [
+   "El parte médico se entrega a Personas en un plazo de 3 días.",
+   "Dispones de una semana para hacer llegar el justificante médico a Recursos Humanos."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "paraphrased_conflict",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_conf_approver",
+  "question": "¿Quién aprueba las compras de más de 1.000 euros?",
+  "texts": [
+   "Las compras superiores a 1.000 euros las aprueba Finanzas.",
+   "Cualquier adquisición que supere los mil euros requiere el visto bueno de Dirección general, no de Finanzas."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "paraphrased_conflict",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_conf_yes_no",
+  "question": "¿Se puede fumar en la terraza?",
+  "texts": [
+   "Está permitido fumar en la terraza del edificio.",
+   "Queda prohibido el consumo de tabaco en todo el recinto, incluida la terraza."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "paraphrased_conflict",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_agree_days_words",
+  "question": "¿Cuántos días de vacaciones hay?",
+  "texts": [
+   "Las vacaciones anuales son 25 días laborables.",
+   "Cada persona dispone de veinticinco jornadas laborables de descanso al año."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "paraphrased_agreement",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_agree_deadline",
+  "question": "¿En qué plazo hay que entregar el parte médico?",
+  "texts": [
+   "El parte médico se entrega a Personas en un plazo de 7 días.",
+   "Dispones de una semana para hacer llegar el justificante médico a Personas."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "paraphrased_agreement",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_distinct_not_conflict",
+  "question": "¿Cuántos días de vacaciones hay?",
+  "texts": [
+   "Las vacaciones anuales son 25 días laborables.",
+   "El permiso por matrimonio es de 15 días naturales."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "different_facts",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_distinct_scopes",
+  "question": "¿Cuál es el límite de alojamiento en Madrid?",
+  "texts": [
+   "El límite de alojamiento en Madrid es de 120 euros por noche.",
+   "En el resto de España el límite de alojamiento es de 90 euros por noche."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "different_scopes",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "d_complement_not_conflict",
+  "question": "¿Cuándo se cobra la nómina y por qué medio?",
+  "texts": [
+   "La nómina se cobra el último día laborable de cada mes.",
+   "La nómina se abona por transferencia bancaria."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "complementary",
+  "baseline_answer": "Respuesta candidata [1]."
+ }
+]
