@@ -429,3 +429,28 @@ def test_old_version_question_quoted_from_both_versions_is_rechecked_with_the_ol
     client, calls = scripted(both, NO, NO)
     _, _, meta = documentary_answer(client, question, sources)
     assert meta["abstention_reason"] == "insufficient_evidence" and len(calls) == 3
+
+
+def test_an_answer_that_only_echoes_the_question_is_not_an_answer():
+    sources = [{"content": "Las compras requieren aprobación de la responsable del workspace."}]
+    echo = {"reason": "x", "answers": True, "answer": "La responsable del workspace"}
+    client, _ = scripted(
+        selection("Las compras requieren aprobación de la responsable del workspace."), echo
+    )
+    text, _, meta = documentary_answer(
+        client, "¿Cómo se llama la responsable del workspace?", sources
+    )
+    assert meta["abstention_reason"] == "insufficient_evidence"
+    assert meta["assessment"]["answer_echoes_question"] is True and "[1]" not in text
+
+
+def test_a_yes_no_question_may_be_answered_with_its_own_words():
+    sources = [{"content": "Los trayectos de más de 6 horas pueden reservarse en clase business."}]
+    yes = {"reason": "x", "answers": True, "answer": "business"}
+    client, _ = scripted(
+        selection("Los trayectos de más de 6 horas pueden reservarse en clase business."), yes
+    )
+    _, _, meta = documentary_answer(
+        client, "¿Puedo volar en business en un trayecto largo?", sources
+    )
+    assert meta["abstention_reason"] is None
