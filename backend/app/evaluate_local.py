@@ -100,8 +100,29 @@ def load_cases(path=EVALS / "local_cases.json"):
         terms = case.get("expected_answer_terms", [])
         if not isinstance(terms, list) or (terms and case["expected_abstention"]):
             raise ValueError("Answer terms are only valid for answerable cases")
+        if any(not isinstance(t, str) for t in case.get("forbidden_answer_terms", [])):
+            raise ValueError("forbidden_answer_terms must be a list of strings")
     dataset["path"] = Path(path).name
+    dataset["dir"] = Path(path).resolve().parent
     return dataset
+
+
+MIME = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".md": "text/markdown",
+    ".txt": "text/plain",
+}
+
+
+def document_payload(document, base_dir):
+    """(filename, bytes, mime) for an inline-text fixture or a real file next to the dataset."""
+    if "file" in document:
+        path = (Path(base_dir) / document["file"]).resolve()
+        if Path(base_dir).resolve() not in path.parents:
+            raise ValueError("Fixture files must live next to the dataset")
+        return document["filename"], path.read_bytes(), MIME.get(path.suffix, "text/plain")
+    return document["filename"], document["text"].encode(), "text/plain"
 
 
 def _fold(text):
@@ -233,6 +254,8 @@ def classify_case(case):
         return "unsupported_answer"
     if case.get("literal_quotes_verified") is False:
         return "unsupported_answer"
+    if case.get("forbidden_terms_absent") is False:
+        return "incorrect_answer"
     if case.get("answer_terms_present") is False:
         return "incomplete_answer"
     return "correct"
@@ -279,6 +302,7 @@ def summarize(results):
                 "correct_abstention",
                 "false_abstention",
                 "incomplete_answer",
+                "incorrect_answer",
                 "unsupported_answer",
                 "timeout",
                 "technical_error",
@@ -384,10 +408,8 @@ def run(*, credentials_file=None, cases_path=None):
                 credentials_file.flush()
             for document in dataset["documents"]:
                 started = time.perf_counter()
-                response = api.post(
-                    "/api/documents",
-                    files={"file": (document["filename"], document["text"].encode(), "text/plain")},
-                )
+                name, content, mime = document_payload(document, dataset["dir"])
+                response = api.post("/api/documents", files={"file": (name, content, mime)})
                 ingestion.append(
                     {
                         "fixture": document["filename"],
@@ -482,9 +504,14 @@ def run(*, credentials_file=None, cases_path=None):
                 result["quote_count"] = quote_count
                 result["literal_quotes_verified"] = quotes_ok
                 terms = case.get("expected_answer_terms", [])
-                if terms and not result["abstained"]:
+                if not result["abstained"]:
                     answer = _fold(body["answer"])
-                    result["answer_terms_present"] = all(_fold(t) in answer for t in terms)
+                    if terms:
+                        result["answer_terms_present"] = all(_fold(t) in answer for t in terms)
+                    if case.get("forbidden_answer_terms"):
+                        result["forbidden_terms_absent"] = not any(
+                            _fold(t) in answer for t in case["forbidden_answer_terms"]
+                        )
                 result["classification"] = classify_case(result)
                 results.append(result)
             checks["ask_never_mutated"] = not request("GET", "/api/actions") and not request(
@@ -647,6 +674,7 @@ def fixture_checks_passed(report):
         and summary["all_returned_citation_ids_valid"] is True
         and summary["all_quotes_literal"] is True
         and summary["classification_counts"]["incomplete_answer"] == 0
+        and summary["classification_counts"]["incorrect_answer"] == 0
         and all(report["journey_checks"].values())
     )
 

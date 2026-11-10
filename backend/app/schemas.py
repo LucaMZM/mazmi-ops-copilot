@@ -31,6 +31,7 @@ class Source(BaseModel):
     excerpt: str
     score: float
     section: str | None = None
+    superseded: bool = False
 
 
 class PendingAction(BaseModel):

@@ -1,0 +1,299 @@
+{
+  "purpose": "Corpus ficticio realista de Aurelia Logística S.L. (PDF, DOCX, MD, TXT). Reservado: escrito antes de medir y no ejecutado hasta la medición final; no se usa para ajustar nada.",
+  "documents": [
+    {
+      "filename": "comunicado-comedor.txt",
+      "file": "corpus/comunicado-comedor.txt"
+    },
+    {
+      "filename": "contrato-transportes-rapido-norte.pdf",
+      "file": "corpus/contrato-transportes-rapido-norte.pdf"
+    },
+    {
+      "filename": "faq-clientes-devoluciones.md",
+      "file": "corpus/faq-clientes-devoluciones.md"
+    },
+    {
+      "filename": "manual-empleado-2025.docx",
+      "file": "corpus/manual-empleado-2025.docx"
+    },
+    {
+      "filename": "onboarding-nuevas-incorporaciones.txt",
+      "file": "corpus/onboarding-nuevas-incorporaciones.txt"
+    },
+    {
+      "filename": "politica-gastos-viajes.pdf",
+      "file": "corpus/politica-gastos-viajes.pdf"
+    },
+    {
+      "filename": "politica-seguridad-informacion.md",
+      "file": "corpus/politica-seguridad-informacion.md"
+    },
+    {
+      "filename": "politica-teletrabajo-2023.pdf",
+      "file": "corpus/politica-teletrabajo-2023.pdf"
+    },
+    {
+      "filename": "politica-teletrabajo-2025.md",
+      "file": "corpus/politica-teletrabajo-2025.md"
+    },
+    {
+      "filename": "procedimiento-incidencias-ti.docx",
+      "file": "corpus/procedimiento-incidencias-ti.docx"
+    }
+  ],
+  "questions": [
+    {
+      "name": "h_weekly_hours",
+      "question": "¿Cuántas horas semanales dura la jornada completa?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "manual-empleado-2025.docx"
+      ],
+      "expected_answer_terms": [
+        "40 horas"
+      ]
+    },
+    {
+      "name": "h_entry_time",
+      "question": "¿Entre qué horas puedo entrar a trabajar?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "manual-empleado-2025.docx"
+      ],
+      "expected_answer_terms": [
+        "7:30",
+        "9:30"
+      ]
+    },
+    {
+      "name": "h_birth_leave",
+      "question": "¿Cuántos días de permiso tengo por el nacimiento de un hijo?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "manual-empleado-2025.docx"
+      ],
+      "expected_answer_terms": [
+        "5 días laborables"
+      ]
+    },
+    {
+      "name": "h_vacation_expiry",
+      "question": "¿Hasta cuándo puedo usar las vacaciones que me sobraron del año anterior?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "manual-empleado-2025.docx"
+      ],
+      "expected_answer_terms": [
+        "31 de enero"
+      ]
+    },
+    {
+      "name": "h_p1_definition",
+      "question": "¿Qué prioridad tiene una caída total del sistema de expediciones y cuánto tarda la primera respuesta?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "procedimiento-incidencias-ti.docx"
+      ],
+      "expected_answer_terms": [
+        "P1",
+        "1 hora"
+      ]
+    },
+    {
+      "name": "h_support_hours",
+      "question": "¿Cuál es el horario del servicio de soporte?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "procedimiento-incidencias-ti.docx"
+      ],
+      "expected_answer_terms": [
+        "8:00",
+        "20:00"
+      ]
+    },
+    {
+      "name": "h_night_guard",
+      "question": "¿A qué extensión llamo si hay una incidencia crítica de madrugada?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "procedimiento-incidencias-ti.docx"
+      ],
+      "expected_answer_terms": [
+        "4199"
+      ]
+    },
+    {
+      "name": "h_lost_laptop",
+      "question": "¿En cuánto tiempo hay que avisar de que he perdido un portátil de la empresa?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-seguridad-informacion.md"
+      ],
+      "expected_answer_terms": [
+        "2 horas"
+      ]
+    },
+    {
+      "name": "h_mfa",
+      "question": "¿Es obligatoria la autenticación en dos pasos?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-seguridad-informacion.md"
+      ],
+      "expected_answer_terms": [
+        "obligatorio"
+      ]
+    },
+    {
+      "name": "h_full_per_diem_abroad",
+      "question": "¿Cuánto es la dieta completa en el extranjero?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-gastos-viajes.pdf"
+      ],
+      "expected_answer_terms": [
+        "60 euros"
+      ]
+    },
+    {
+      "name": "h_approve_2000",
+      "question": "¿Quién aprueba un gasto de 2.000 euros?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-gastos-viajes.pdf"
+      ],
+      "expected_answer_terms": [
+        "Dirección general"
+      ]
+    },
+    {
+      "name": "h_business_class",
+      "question": "¿Puedo volar en business si el trayecto dura más de 6 horas?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-gastos-viajes.pdf"
+      ],
+      "expected_answer_terms": [
+        "business"
+      ]
+    },
+    {
+      "name": "h_contract_term",
+      "question": "¿Cuánto dura la vigencia del contrato con el transportista?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "contrato-transportes-rapido-norte.pdf"
+      ],
+      "expected_answer_terms": [
+        "24 meses"
+      ]
+    },
+    {
+      "name": "h_contract_notice",
+      "question": "¿Con cuánto preaviso se puede resolver el contrato con el proveedor de transporte?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "contrato-transportes-rapido-norte.pdf"
+      ],
+      "expected_answer_terms": [
+        "60 días"
+      ]
+    },
+    {
+      "name": "h_insurance",
+      "question": "¿De cuánto es el seguro de responsabilidad civil del transportista?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "contrato-transportes-rapido-norte.pdf"
+      ],
+      "expected_answer_terms": [
+        "100.000 euros"
+      ]
+    },
+    {
+      "name": "h_refund_time",
+      "question": "¿En cuántos días me reembolsan una devolución?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "faq-clientes-devoluciones.md"
+      ],
+      "expected_answer_terms": [
+        "14 días"
+      ]
+    },
+    {
+      "name": "h_warranty",
+      "question": "¿Cuántos años de garantía tienen los productos?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "faq-clientes-devoluciones.md"
+      ],
+      "expected_answer_terms": [
+        "3 años"
+      ]
+    },
+    {
+      "name": "h_prl_training",
+      "question": "¿Cuánto dura la formación obligatoria de prevención de riesgos y cuándo hay que hacerla?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "onboarding-nuevas-incorporaciones.txt"
+      ],
+      "expected_answer_terms": [
+        "4 horas",
+        "primera semana"
+      ]
+    },
+    {
+      "name": "h_office_day",
+      "question": "¿Qué día de la semana es presencial para todos los equipos?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-teletrabajo-2025.md"
+      ],
+      "expected_answer_terms": [
+        "miércoles"
+      ]
+    },
+    {
+      "name": "h_neg_exec_vacation",
+      "question": "¿Cuántos días extra de vacaciones tienen los directivos?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "h_neg_maternity_weeks",
+      "question": "¿Cuántas semanas de permiso por maternidad hay?",
+      "expected_abstention": true,
+      "expected_documents": [],
+      "note": "El manual solo recoge 5 días laborables por nacimiento o adopción."
+    },
+    {
+      "name": "h_neg_extra_kg",
+      "question": "¿Qué tarifa cobra el transportista por cada kilo de peso extra?",
+      "expected_abstention": true,
+      "expected_documents": [],
+      "note": "El contrato fija la tarifa por bulto hasta 30 kg, no por kilo adicional."
+    },
+    {
+      "name": "h_neg_employee_discount",
+      "question": "¿Hay descuentos para empleados en los productos?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "h_neg_guest_wifi",
+      "question": "¿Cuál es la contraseña de la wifi de invitados?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "h_neg_teleworking_2024",
+      "question": "¿Cuántos días de teletrabajo permitía la versión de 2024?",
+      "expected_abstention": true,
+      "expected_documents": [],
+      "note": "Solo existen las versiones de 2023 y de 2025."
+    }
+  ]
+}

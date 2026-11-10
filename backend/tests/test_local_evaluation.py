@@ -181,3 +181,64 @@ def test_failed_journey_preserves_operation_without_secrets_or_resource_ids(path
     assert "private-token" not in serialized
     assert "01234567-89ab-cdef-0123-456789abcdef" not in serialized
     assert "?" not in serialized
+
+
+REALISTIC = evaluation.EVALS / "realistic"
+
+
+@pytest.mark.parametrize("name", ["cases.json", "holdout.json"])
+def test_realistic_datasets_are_answerable_from_the_extracted_text(name):
+    """A typo in a fixture would silently turn a product failure into a dataset failure.
+
+    Every expected term must appear in the text the application itself extracts from the
+    expected documents; forbidden terms must exist somewhere (otherwise they test nothing).
+    """
+    from app.rag import extract_pages
+
+    data = evaluation.load_cases(REALISTIC / name)
+    texts = {}
+    for document in data["documents"]:
+        filename, content, _ = evaluation.document_payload(document, data["dir"])
+        texts[filename] = evaluation._fold(
+            "\n".join(text for _, text in extract_pages(filename, content))
+        )
+    everything = " ".join(texts.values())
+    for case in data["questions"]:
+        expected = " ".join(texts[doc] for doc in case["expected_documents"])
+        for term in case.get("expected_answer_terms", []):
+            assert evaluation._fold(term) in expected, (case["name"], term)
+        for term in case.get("forbidden_answer_terms", []):
+            assert evaluation._fold(term) in everything, (case["name"], term)
+
+
+def test_realistic_sets_are_disjoint_and_cover_the_three_kinds_of_question():
+    dev = evaluation.load_cases(REALISTIC / "cases.json")["questions"]
+    hold = evaluation.load_cases(REALISTIC / "holdout.json")["questions"]
+    assert not {q["question"] for q in dev} & {q["question"] for q in hold}
+    for questions in (dev, hold):
+        assert any(q["expected_abstention"] for q in questions)
+        assert sum(not q["expected_abstention"] for q in questions) >= 15
+
+
+def test_fixture_files_cannot_escape_their_dataset_directory(tmp_path):
+    (tmp_path / "ok.txt").write_text("hola")
+    outside = tmp_path.parent / "outside.txt"
+    outside.write_text("secreto")
+    assert evaluation.document_payload({"filename": "ok.txt", "file": "ok.txt"}, tmp_path)[2] == (
+        "text/plain"
+    )
+    with pytest.raises(ValueError, match="next to the dataset"):
+        evaluation.document_payload({"filename": "x", "file": "../outside.txt"}, tmp_path)
+
+
+def test_a_contradicting_answer_is_incorrect_even_when_the_expected_term_is_present():
+    case = {
+        "expected_abstention": False,
+        "abstained": False,
+        "all_expected_documents_cited": True,
+        "literal_quotes_verified": True,
+        "answer_terms_present": True,
+        "forbidden_terms_absent": False,
+    }
+    assert evaluation.classify_case(case) == "incorrect_answer"
+    assert evaluation.classify_case({**case, "forbidden_terms_absent": True}) == "correct"

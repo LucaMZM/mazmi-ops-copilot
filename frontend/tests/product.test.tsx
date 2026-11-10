@@ -610,3 +610,15 @@ test("local verification timeout does not retry and explains that the backend ma
   expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith("/check-local"))).toHaveLength(1);
   expect(screen.getByRole("button", { name: "Verificar Ollama" })).toBeEnabled();
 });
+test("a verified answer lead is highlighted above its literal evidence", () => {
+  render(
+    <AnswerText
+      text={"Respuesta: 23 días laborables\n\nSegún manual.docx (2. Vacaciones):\n«Cada persona dispone de 23 días laborables.» [1]"}
+      sources={[]}
+      onSource={() => undefined}
+    />,
+  );
+  expect(screen.getByText("Respuesta")).toBeInTheDocument();
+  expect(screen.getByText("23 días laborables", { selector: "strong" })).toBeInTheDocument();
+  expect(screen.getByText(/Cada persona dispone/)).toBeInTheDocument();
+});

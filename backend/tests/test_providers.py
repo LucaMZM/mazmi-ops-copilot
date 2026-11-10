@@ -350,3 +350,113 @@ def test_reasoning_off_disables_thinking_and_is_never_greedy(monkeypatch):
     assert payload["messages"][0]["content"].endswith("/no_think")
     assert payload["options"]["temperature"] == 0.7 and payload["options"]["top_k"] == 20
     assert payload["format"] == {"type": "object"} and payload["options"]["seed"] == 42
+
+
+def test_warm_up_loads_both_models_with_the_configured_keep_alive():
+    seen = []
+
+    def server(req):
+        seen.append((req.url.path, json.loads(req.content)))
+        return httpx.Response(200, json={})
+
+    assert Ollama(httpx.MockTransport(server)).warm_up() == ["qwen3:4b", "embeddinggemma"]
+    assert [path for path, _ in seen] == ["/api/generate", "/api/embed"]
+    assert all(body["keep_alive"] == settings.ollama_keep_alive for _, body in seen)
+    assert "prompt" not in seen[0][1]  # load-only: nothing is generated
+
+
+def test_warm_up_never_raises_when_ollama_is_down_or_a_model_is_missing():
+    def down(req):
+        raise httpx.ConnectError("private address")
+
+    assert Ollama(httpx.MockTransport(down)).warm_up() == []
+
+    def missing_chat_model(req):
+        return httpx.Response(404 if req.url.path == "/api/generate" else 200, json={})
+
+    assert Ollama(httpx.MockTransport(missing_chat_model)).warm_up() == ["embeddinggemma"]
+
+
+TICKET_TOOL = {
+    "type": "function",
+    "name": "create_ticket",
+    "description": "Propone un ticket interno.",
+    "parameters": {"type": "object", "properties": {"title": {"type": "string"}}},
+}
+
+
+def test_with_reasoning_off_the_single_tool_is_requested_as_constrained_json(monkeypatch):
+    monkeypatch.setattr(settings, "ollama_reasoning", "off")
+    seen = []
+
+    def server(req):
+        seen.append(json.loads(req.content))
+        return httpx.Response(
+            200,
+            json={
+                "message": {"content": '{"title": "Revisar"}'},
+                "done": True,
+                "done_reason": "stop",
+            },
+        )
+
+    client = Ollama(httpx.MockTransport(server))
+    kwargs = {
+        "model": "qwen3:4b",
+        "instructions": "Elige.",
+        "input": [],
+        "tools": [TICKET_TOOL],
+        "max_output_tokens": 3000,
+    }
+    result = client.create(**kwargs)
+    assert seen[0]["tools"] == [] and seen[0]["format"] == TICKET_TOOL["parameters"]
+    assert seen[0]["options"]["num_predict"] == 700 and seen[0]["think"] is False
+    assert "create_ticket" in seen[0]["messages"][0]["content"]
+    assert seen[0]["messages"][0]["content"].endswith("/no_think")
+    assert result.status == "completed" and result.output_text == ""
+    assert [(c.name, json.loads(c.arguments)) for c in result.output] == [
+        ("create_ticket", {"title": "Revisar"})
+    ]
+
+
+def test_forced_tool_stream_emits_no_text_and_one_call(monkeypatch):
+    monkeypatch.setattr(settings, "ollama_reasoning", "off")
+    frames = [
+        {"message": {"content": '{"title": '}, "done": False},
+        {"message": {"content": '"Revisar"}'}, "done": True, "done_reason": "stop"},
+    ]
+    client = Ollama(
+        httpx.MockTransport(
+            lambda r: httpx.Response(200, text="\n".join(json.dumps(f) for f in frames))
+        )
+    )
+    with client.create(model="qwen3:4b", input=[], tools=[TICKET_TOOL], stream=True) as stream:
+        events = list(stream)
+    assert [e.type for e in events] == ["response.completed"]
+    assert events[0].response.output[0].name == "create_ticket"
+
+
+@pytest.mark.parametrize("content,reason", [("[1, 2]", "stop"), ("no es json", "stop")])
+def test_forced_tool_rejects_anything_that_is_not_a_json_object(monkeypatch, content, reason):
+    monkeypatch.setattr(settings, "ollama_reasoning", "off")
+    frame = {"message": {"content": content}, "done": True, "done_reason": reason}
+    client = Ollama(httpx.MockTransport(lambda r: httpx.Response(200, json=frame)))
+    with pytest.raises(ProviderUnavailable):
+        client.create(model="qwen3:4b", input=[], tools=[TICKET_TOOL])
+
+
+def test_truncated_forced_tool_output_is_incomplete_and_never_a_call(monkeypatch):
+    monkeypatch.setattr(settings, "ollama_reasoning", "off")
+    frame = {"message": {"content": '{"title": "Rev'}, "done": True, "done_reason": "length"}
+    client = Ollama(httpx.MockTransport(lambda r: httpx.Response(200, json=frame)))
+    result = client.create(model="qwen3:4b", input=[], tools=[TICKET_TOOL])
+    assert result.status == "incomplete" and result.output == []
+
+
+def test_native_tool_calling_is_kept_with_reasoning_on_or_several_tools(monkeypatch):
+    kwargs = {"model": "qwen3:4b", "input": [], "tools": [TICKET_TOOL]}
+    assert Ollama.forced_tool(kwargs) is None  # conftest: reasoning on
+    assert len(Ollama().payload(kwargs)["tools"]) == 1
+    monkeypatch.setattr(settings, "ollama_reasoning", "off")
+    assert Ollama.forced_tool({**kwargs, "tools": [TICKET_TOOL, TICKET_TOOL]}) is None
+    assert Ollama.forced_tool({**kwargs, "tools": []}) is None

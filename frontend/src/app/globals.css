@@ -978,6 +978,24 @@ time {
 .answerBlock > span:empty {
   height: 0.75em;
 }
+.answerLead {
+  display: grid;
+  gap: 2px;
+  margin-bottom: var(--space-2);
+}
+.answerLead > span {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.answerLead > strong {
+  color: var(--ink);
+  font-size: var(--text-lg);
+  font-weight: 650;
+  line-height: 1.25;
+}
 .answerOrigin {
   margin-top: var(--space-1);
   color: var(--ink-3);

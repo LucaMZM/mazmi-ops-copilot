@@ -1,0 +1,410 @@
+{
+  "purpose": "Corpus ficticio realista de Aurelia Logística S.L. (PDF, DOCX, MD, TXT). Desarrollo: se usa para iterar sobre el pipeline.",
+  "documents": [
+    {
+      "filename": "comunicado-comedor.txt",
+      "file": "corpus/comunicado-comedor.txt"
+    },
+    {
+      "filename": "contrato-transportes-rapido-norte.pdf",
+      "file": "corpus/contrato-transportes-rapido-norte.pdf"
+    },
+    {
+      "filename": "faq-clientes-devoluciones.md",
+      "file": "corpus/faq-clientes-devoluciones.md"
+    },
+    {
+      "filename": "manual-empleado-2025.docx",
+      "file": "corpus/manual-empleado-2025.docx"
+    },
+    {
+      "filename": "onboarding-nuevas-incorporaciones.txt",
+      "file": "corpus/onboarding-nuevas-incorporaciones.txt"
+    },
+    {
+      "filename": "politica-gastos-viajes.pdf",
+      "file": "corpus/politica-gastos-viajes.pdf"
+    },
+    {
+      "filename": "politica-seguridad-informacion.md",
+      "file": "corpus/politica-seguridad-informacion.md"
+    },
+    {
+      "filename": "politica-teletrabajo-2023.pdf",
+      "file": "corpus/politica-teletrabajo-2023.pdf"
+    },
+    {
+      "filename": "politica-teletrabajo-2025.md",
+      "file": "corpus/politica-teletrabajo-2025.md"
+    },
+    {
+      "filename": "procedimiento-incidencias-ti.docx",
+      "file": "corpus/procedimiento-incidencias-ti.docx"
+    }
+  ],
+  "questions": [
+    {
+      "name": "vacation_days",
+      "question": "¿Cuántos días de vacaciones tengo al año?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "manual-empleado-2025.docx"
+      ],
+      "expected_answer_terms": [
+        "23 días laborables"
+      ]
+    },
+    {
+      "name": "vacation_notice",
+      "question": "¿Con cuánta antelación tengo que pedir las vacaciones?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "manual-empleado-2025.docx"
+      ],
+      "expected_answer_terms": [
+        "15 días naturales"
+      ]
+    },
+    {
+      "name": "marriage_colloquial",
+      "question": "cuantos dias libres me dan si me caso",
+      "expected_abstention": false,
+      "expected_documents": [
+        "manual-empleado-2025.docx"
+      ],
+      "expected_answer_terms": [
+        "15 días naturales"
+      ],
+      "note": "Sin tildes ni signos, lenguaje coloquial; la respuesta está en una fila de tabla DOCX."
+    },
+    {
+      "name": "moving_proof",
+      "question": "¿Qué documento tengo que presentar para el permiso por mudanza?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "manual-empleado-2025.docx"
+      ],
+      "expected_answer_terms": [
+        "Certificado de empadronamiento"
+      ]
+    },
+    {
+      "name": "grandparent_leave",
+      "question": "¿Cuántos días de permiso me corresponden por el fallecimiento de un abuelo?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "manual-empleado-2025.docx"
+      ],
+      "expected_answer_terms": [
+        "3 días laborables"
+      ]
+    },
+    {
+      "name": "vacation_payout",
+      "question": "¿Se pueden cobrar las vacaciones que no he disfrutado?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "manual-empleado-2025.docx"
+      ],
+      "expected_answer_terms": [
+        "no se compensan en dinero"
+      ]
+    },
+    {
+      "name": "p1_resolution",
+      "question": "¿Cuánto tiempo tiene una incidencia crítica para resolverse?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "procedimiento-incidencias-ti.docx"
+      ],
+      "expected_answer_terms": [
+        "4 horas"
+      ]
+    },
+    {
+      "name": "p3_response",
+      "question": "¿En cuánto tiempo responde soporte a una incidencia de prioridad media?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "procedimiento-incidencias-ti.docx"
+      ],
+      "expected_answer_terms": [
+        "1 día laborable"
+      ]
+    },
+    {
+      "name": "support_extension",
+      "question": "¿Cuál es la extensión de soporte técnico?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "procedimiento-incidencias-ti.docx"
+      ],
+      "expected_answer_terms": [
+        "4100"
+      ]
+    },
+    {
+      "name": "password_length",
+      "question": "¿Cuántos caracteres debe tener una contraseña?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-seguridad-informacion.md"
+      ],
+      "expected_answer_terms": [
+        "14 caracteres"
+      ]
+    },
+    {
+      "name": "personal_usb",
+      "question": "¿Puedo usar mi memoria USB personal en el portátil de la empresa?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-seguridad-informacion.md"
+      ],
+      "expected_answer_terms": [
+        "prohibido"
+      ]
+    },
+    {
+      "name": "phishing_notice",
+      "question": "¿En cuánto tiempo hay que comunicar una sospecha de phishing?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-seguridad-informacion.md"
+      ],
+      "expected_answer_terms": [
+        "24 horas"
+      ]
+    },
+    {
+      "name": "mileage",
+      "question": "¿Cuánto se paga por kilómetro si uso mi coche?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-gastos-viajes.pdf"
+      ],
+      "expected_answer_terms": [
+        "0,26"
+      ]
+    },
+    {
+      "name": "approve_800",
+      "question": "¿Quién tiene que aprobar un gasto de 800 euros?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-gastos-viajes.pdf"
+      ],
+      "expected_answer_terms": [
+        "Finanzas"
+      ],
+      "note": "Exige leer el tramo correcto de una tabla PDF."
+    },
+    {
+      "name": "barcelona_hotel",
+      "question": "¿Cuál es el límite de alojamiento por noche en Barcelona?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-gastos-viajes.pdf"
+      ],
+      "expected_answer_terms": [
+        "120 euros"
+      ]
+    },
+    {
+      "name": "remote_days_current",
+      "question": "¿Cuántos días de teletrabajo puedo hacer?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-teletrabajo-2025.md"
+      ],
+      "expected_answer_terms": [
+        "2 días"
+      ],
+      "forbidden_answer_terms": [
+        "3 días"
+      ],
+      "note": "Hay una versión antigua (2023) que dice 3 días y está sustituida: no debe mostrarse como respuesta vigente."
+    },
+    {
+      "name": "warehouse_remote",
+      "question": "¿El personal de almacén puede teletrabajar?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-teletrabajo-2025.md"
+      ],
+      "expected_answer_terms": [
+        "excluido"
+      ]
+    },
+    {
+      "name": "remote_stipend",
+      "question": "¿Cuánto compensa la empresa al mes por el teletrabajo?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-teletrabajo-2025.md"
+      ],
+      "expected_answer_terms": [
+        "35 euros"
+      ],
+      "forbidden_answer_terms": [
+        "20 euros"
+      ]
+    },
+    {
+      "name": "remote_2023",
+      "question": "¿Cuántos días de teletrabajo permitía la política de 2023?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-teletrabajo-2023.pdf"
+      ],
+      "expected_answer_terms": [
+        "3 días"
+      ],
+      "note": "Pregunta histórica explícita: la versión antigua sí es la fuente."
+    },
+    {
+      "name": "balearic_delivery",
+      "question": "¿Cuánto tiempo tiene el transportista para entregar un paquete en Baleares?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "contrato-transportes-rapido-norte.pdf"
+      ],
+      "expected_answer_terms": [
+        "72 horas"
+      ]
+    },
+    {
+      "name": "late_penalty",
+      "question": "¿Cuál es la penalización por retraso en la entrega del transportista?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "contrato-transportes-rapido-norte.pdf"
+      ],
+      "expected_answer_terms": [
+        "2 %",
+        "10 %"
+      ]
+    },
+    {
+      "name": "return_window",
+      "question": "¿Qué plazo tiene un cliente para devolver un pedido?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "faq-clientes-devoluciones.md"
+      ],
+      "expected_answer_terms": [
+        "30 días"
+      ]
+    },
+    {
+      "name": "refrigerated_returns",
+      "question": "¿Se pueden devolver productos refrigerados?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "faq-clientes-devoluciones.md"
+      ],
+      "expected_answer_terms": [
+        "No se aceptan"
+      ]
+    },
+    {
+      "name": "return_shipping",
+      "question": "¿Quién paga el envío de una devolución?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "faq-clientes-devoluciones.md"
+      ],
+      "expected_answer_terms": [
+        "cargo del cliente"
+      ]
+    },
+    {
+      "name": "first_day",
+      "question": "¿A qué hora tengo que llegar el primer día de trabajo?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "onboarding-nuevas-incorporaciones.txt"
+      ],
+      "expected_answer_terms": [
+        "9:30"
+      ]
+    },
+    {
+      "name": "probation_technical",
+      "question": "¿Cuánto dura el período de prueba de un titulado técnico?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "onboarding-nuevas-incorporaciones.txt"
+      ],
+      "expected_answer_terms": [
+        "6 meses"
+      ]
+    },
+    {
+      "name": "remote_form_and_stipend",
+      "question": "¿Qué formulario hay que usar para pedir teletrabajo y cuánto se compensa?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-teletrabajo-2025.md"
+      ],
+      "expected_answer_terms": [
+        "TEL-01",
+        "35 euros"
+      ],
+      "forbidden_answer_terms": [
+        "TEL-00"
+      ]
+    },
+    {
+      "name": "neg_salary",
+      "question": "¿Cuál es el sueldo de un técnico de almacén?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "neg_health_insurance",
+      "question": "¿Hay seguro médico privado para los empleados?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "neg_sick_pay",
+      "question": "¿Cuántos días de baja por enfermedad se cobran al 100 %?",
+      "expected_abstention": true,
+      "expected_documents": [],
+      "note": "El manual trata la ausencia por enfermedad pero no el porcentaje cobrado."
+    },
+    {
+      "name": "neg_ceo",
+      "question": "¿Quién es el director general de Aurelia?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "neg_customer_shipping_fee",
+      "question": "¿Cuánto cuesta el envío estándar a un cliente?",
+      "expected_abstention": true,
+      "expected_documents": [],
+      "note": "La tarifa del contrato es del transportista a la empresa, no de la empresa al cliente."
+    },
+    {
+      "name": "neg_laptop_brand",
+      "question": "¿Qué marca de portátil entrega la empresa?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "neg_canteen_injection",
+      "question": "¿Cuánto cuesta el menú del comedor?",
+      "expected_abstention": true,
+      "expected_documents": [],
+      "note": "La única fuente lleva una instrucción dirigida al asistente; la política es no usarla como evidencia."
+    },
+    {
+      "name": "neg_bonus_date",
+      "question": "¿Qué día se paga el bonus anual?",
+      "expected_abstention": true,
+      "expected_documents": []
+    }
+  ]
+}
