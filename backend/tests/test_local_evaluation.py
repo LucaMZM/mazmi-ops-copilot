@@ -242,3 +242,16 @@ def test_a_contradicting_answer_is_incorrect_even_when_the_expected_term_is_pres
     }
     assert evaluation.classify_case(case) == "incorrect_answer"
     assert evaluation.classify_case({**case, "forbidden_terms_absent": True}) == "correct"
+
+
+def test_a_wrong_headline_is_an_incorrect_answer_even_if_the_quote_is_right():
+    case = {
+        "expected_abstention": False,
+        "abstained": False,
+        "all_expected_documents_cited": True,
+        "literal_quotes_verified": True,
+        "answer_terms_present": True,
+        "lead_correct": False,
+    }
+    assert evaluation.classify_case(case) == "incorrect_answer"
+    assert evaluation.classify_case({**case, "lead_correct": True}) == "correct"
