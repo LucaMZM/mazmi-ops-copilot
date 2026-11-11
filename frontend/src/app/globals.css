@@ -91,9 +91,15 @@
   --radius-xl: 28px;
   --radius-pill: 999px;
   --blur: 22px;
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Motion tokens. Enter/exit: ease-out. On-screen movement: ease-in-out. Sheets: drawer.
+     UI motion stays under 300 ms; press feedback 160 ms. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease: var(--ease-out);
+  --press: 160ms;
   --fast: 140ms;
-  --medium: 260ms;
+  --medium: 240ms;
   --sidebar-w: 268px;
   --gutter: 12px;
 }
@@ -321,8 +327,25 @@ time {
 .primary:active:not(:disabled),
 .ghost:active:not(:disabled),
 .iconButton:active:not(:disabled),
-.send:active:not(:disabled) {
+.send:active:not(:disabled),
+.stopButton:active:not(:disabled) {
   transform: scale(0.97);
+}
+/* Larger surfaces press less: the same 0.97 on a wide row reads as a jump. */
+:is(
+    .nav,
+    .sourceChip,
+    .conversationLink,
+    .conversationRow,
+    .documentLink,
+    .promptList button,
+    .suggestedPrompts button,
+    .modeSwitch button,
+    .tabBar button,
+    .segmentedChoice button,
+    .uploadZone
+  ):active:not(:disabled) {
+  transform: scale(0.985);
 }
 .textButton {
   border: 0;
@@ -540,6 +563,7 @@ time {
   cursor: pointer;
 }
 .primaryNav {
+  position: relative;
   display: grid;
   gap: 2px;
 }
@@ -573,6 +597,41 @@ time {
 }
 .nav.active svg {
   color: var(--accent);
+}
+.primaryNav.hasIndicator .nav {
+  z-index: 1;
+}
+.primaryNav.hasIndicator .nav.active {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.navIndicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-strong);
+  box-shadow: 0 4px 14px -8px rgba(18, 48, 40, 0.35), inset 0 1px 0 var(--glass-highlight);
+  pointer-events: none;
+}
+.navIndicator[data-ready="true"] {
+  transition: transform 220ms var(--ease-in-out);
+}
+.viewStage {
+  display: contents;
+}
+.viewStage > *,
+.chatLayout {
+  transition:
+    opacity 180ms var(--ease-out),
+    transform 180ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 .navLabel {
   flex: 1;
@@ -826,6 +885,10 @@ time {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  /* Scroll edge effect: content softens where it meets the floating top bar and composer
+     instead of being cut by a hard line. A static mask, nothing animates. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 18px, #000 calc(100% - 14px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 18px, #000 calc(100% - 14px), transparent 100%);
 }
 .chatColumn {
   display: grid;
@@ -915,7 +978,16 @@ time {
 .messageRow {
   display: grid;
   gap: var(--space-2);
-  animation: rise var(--medium) var(--ease);
+}
+.messageRow.enter,
+.messageRow.draft {
+  transition:
+    opacity 220ms var(--ease-out),
+    transform 220ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 .messageIdentity {
   display: flex;
@@ -1073,7 +1145,11 @@ time {
 }
 .sourceChip:hover {
   border-color: var(--accent);
-  transform: translateY(-1px);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sourceChip:hover:not(:active) {
+    transform: translateY(-1px);
+  }
 }
 .sourceChip.cited {
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
@@ -1199,8 +1275,14 @@ time {
   color: var(--ink);
   font-size: var(--text-sm);
   font-weight: 600;
-  transform: translateX(-50%);
-  animation: rise var(--medium) var(--ease);
+  translate: -50% 0;
+  transition:
+    opacity 180ms var(--ease-out),
+    transform 180ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
 }
 
 /* The composer: the one bold element. */
@@ -1357,6 +1439,30 @@ time {
   border: 1px solid var(--line-strong);
   background: var(--surface-strong);
   color: var(--ink);
+}
+.composerTools .send,
+.composerTools .stopButton {
+  @starting-style {
+    opacity: 0;
+    transform: scale(0.92);
+    filter: blur(2px);
+  }
+}
+.composerTools .stopButton {
+  transition:
+    background-color var(--fast) ease,
+    border-color var(--fast) ease,
+    opacity 160ms var(--ease-out),
+    transform var(--press) var(--ease-out),
+    filter 160ms var(--ease-out);
+}
+.composerTools .send {
+  transition:
+    background-color var(--medium) ease,
+    opacity 160ms var(--ease-out),
+    transform var(--press) var(--ease-out),
+    filter 160ms var(--ease-out),
+    box-shadow var(--medium) ease;
 }
 .composerHint {
   color: var(--ink-3);
@@ -2004,7 +2110,10 @@ details summary {
   justify-content: flex-end;
   padding: var(--gutter);
   background: color-mix(in srgb, var(--bg) 40%, transparent);
-  animation: fade var(--medium) ease;
+  transition: opacity 200ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+  }
 }
 .inspector {
   display: grid;
@@ -2013,7 +2122,25 @@ details summary {
   height: 100%;
   border-radius: var(--radius-xl);
   background: var(--glass-bg-strong);
-  animation: slideIn var(--medium) var(--ease);
+  transition:
+    transform 280ms var(--ease-drawer),
+    opacity 200ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+}
+/* Exit is faster than entry (the system responds, the person is not deciding) and leaves
+   along the path it came from. Transitions, not keyframes: reopening mid-exit retargets. */
+.inspectorBackdrop[data-state="closing"] {
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: 160ms;
+}
+.inspectorBackdrop[data-state="closing"] .inspector {
+  opacity: 0;
+  transform: translateX(28px);
+  transition-duration: 180ms, 160ms;
 }
 .inspector:focus {
   outline: none;
@@ -2072,17 +2199,6 @@ details summary {
   gap: var(--space-3);
   color: var(--ink-3);
   font-size: var(--text-sm);
-}
-@keyframes fade {
-  from {
-    opacity: 0;
-  }
-}
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(24px);
-  }
 }
 
 /* ---------- Authentication ---------- */
@@ -2251,7 +2367,13 @@ details summary {
     align-items: stretch;
     padding: var(--space-4) var(--space-3);
     background: var(--glass-bg-strong);
-    animation: slideIn var(--medium) var(--ease) reverse;
+    transition:
+      transform 280ms var(--ease-drawer),
+      opacity 200ms var(--ease-out);
+    @starting-style {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
   }
   .shell.menuOpen .sidebar :is(.brand div, .workspacePicker, .conversationList, .scopeNote, .accountEmail, .navLabel) {
     display: revert;
@@ -2440,18 +2562,23 @@ details summary {
     width: 100%;
     height: min(86dvh, 100%);
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    animation-name: sheetUp;
+    transition:
+      transform 320ms var(--ease-drawer),
+      opacity 200ms var(--ease-out);
+    @starting-style {
+      opacity: 1;
+      transform: translateY(100%);
+    }
+  }
+  .inspectorBackdrop[data-state="closing"] .inspector {
+    opacity: 1;
+    transform: translateY(100%);
+    transition-duration: 220ms;
   }
 }
 /* Opacity only: a transform here would re-anchor the fixed tab bar during the animation. */
 @keyframes dropIn {
   from {
-    opacity: 0;
-  }
-}
-@keyframes sheetUp {
-  from {
-    transform: translateY(40px);
     opacity: 0;
   }
 }
@@ -2470,11 +2597,61 @@ details summary {
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  /* Movement goes; opacity and colour stay so state changes are still readable. */
+  :is(
+      .messageRow,
+      .viewStage > *,
+      .chatLayout,
+      .inspector,
+      .jumpLatest,
+      .navIndicator,
+      .modeThumb,
+      .composerTools .send,
+      .composerTools .stopButton,
+      .shell.menuOpen .sidebar
+    ) {
+    @starting-style {
+      transform: none;
+      filter: none;
+    }
+  }
+  .inspectorBackdrop[data-state="closing"] .inspector {
+    transform: none;
+  }
+  .navIndicator[data-ready="true"],
+  .modeThumb {
+    transition-property: opacity, background-color;
+  }
+  :is(
+      .primary,
+      .ghost,
+      .iconButton,
+      .send,
+      .stopButton,
+      .nav,
+      .sourceChip,
+      .conversationLink,
+      .conversationRow,
+      .documentLink,
+      .promptList button,
+      .suggestedPrompts button,
+      .modeSwitch button,
+      .tabBar button,
+      .segmentedChoice button,
+      .uploadZone
+    ):is(:active, :hover) {
+    transform: none;
   }
 }
 
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .chatScroll {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
 @media (prefers-reduced-transparency: reduce) {
   .glass,
   .primaryNav,
@@ -2513,4 +2690,23 @@ details summary {
 .conversationRow span,
 .documentLink > span:not(.badge) {
   min-width: 0;
+}
+
+/* Pressable surfaces: colour changes use `ease`, the press itself a short ease-out. Declared
+   last so it composes with each component's own colours instead of being overridden. */
+:is(
+    .nav,
+    .sourceChip,
+    .conversationLink,
+    .conversationRow,
+    .documentLink,
+    .promptList button,
+    .suggestedPrompts button,
+    .tabBar button,
+    .segmentedChoice button,
+    .uploadZone
+  ) {
+  transition-property: background-color, border-color, color, box-shadow, transform;
+  transition-duration: var(--fast), var(--fast), var(--fast), var(--fast), var(--press);
+  transition-timing-function: ease, ease, ease, ease, var(--ease-out);
 }

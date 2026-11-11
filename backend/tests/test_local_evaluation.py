@@ -186,7 +186,7 @@ def test_failed_journey_preserves_operation_without_secrets_or_resource_ids(path
 REALISTIC = evaluation.EVALS / "realistic"
 
 
-@pytest.mark.parametrize("name", ["cases.json", "holdout.json"])
+@pytest.mark.parametrize("name", ["cases.json", "holdout.json", "holdout_b.json"])
 def test_realistic_datasets_are_answerable_from_the_extracted_text(name):
     """A typo in a fixture would silently turn a product failure into a dataset failure.
 
@@ -242,3 +242,16 @@ def test_a_contradicting_answer_is_incorrect_even_when_the_expected_term_is_pres
     }
     assert evaluation.classify_case(case) == "incorrect_answer"
     assert evaluation.classify_case({**case, "forbidden_terms_absent": True}) == "correct"
+
+
+def test_a_wrong_headline_is_an_incorrect_answer_even_if_the_quote_is_right():
+    case = {
+        "expected_abstention": False,
+        "abstained": False,
+        "all_expected_documents_cited": True,
+        "literal_quotes_verified": True,
+        "answer_terms_present": True,
+        "lead_correct": False,
+    }
+    assert evaluation.classify_case(case) == "incorrect_answer"
+    assert evaluation.classify_case({**case, "lead_correct": True}) == "correct"

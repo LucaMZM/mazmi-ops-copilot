@@ -42,11 +42,18 @@ def scripted(*replies):
 
 
 def selection(quote, passage_id=1, status="sufficient"):
-    return {"status": status, "evidence": [{"passage_id": passage_id, "quote": quote}]}
+    return {
+        "status": status,
+        "evidence": [{"passage_id": passage_id, "quote": quote}],
+    }
 
 
-YES = {"reason": "Las citas dan el dato.", "answers": True, "answer": "2 días"}
-NO = {"reason": "Solo mencionan el tema.", "answers": False, "answer": ""}
+def verdict(answer="2 días", *, answers=True):
+    return {"reason": "lectura de las citas", "answers": answers, "answer": answer}
+
+
+YES = verdict()
+NO = verdict("", answers=False)
 QUESTION = "¿Cuántos días por semana se puede teletrabajar?"
 
 
@@ -121,9 +128,7 @@ def test_same_topic_quote_that_does_not_answer_is_refused_by_the_check():
 
 
 def test_empty_answer_in_the_check_is_not_accepted():
-    client, _ = scripted(
-        selection("Los lunes son presenciales."), {"reason": "x", "answers": True, "answer": " "}
-    )
+    client, _ = scripted(selection("Los lunes son presenciales."), verdict(" "))
     _, _, meta = documentary_answer(client, QUESTION, SOURCES)
     assert meta["abstention_reason"] == "insufficient_evidence"
 
@@ -381,7 +386,7 @@ def test_answer_lead_leads_the_answer_and_can_be_switched_off(monkeypatch):
     assert text.startswith("Según t.md") and "answer_lead" not in meta
     # A paraphrased span from the model is silently dropped; the literal evidence remains.
     monkeypatch.setattr(settings, "answer_lead", True)
-    para = {"reason": "x", "answers": True, "answer": "dos días semanales"}
+    para = verdict("dos días semanales")
     client, _ = scripted(selection("Se permite teletrabajar hasta 2 días por semana."), para)
     text, _, meta = documentary_answer(client, QUESTION, SOURCES)
     assert text.startswith("Según t.md") and "answer_lead" not in meta
@@ -416,7 +421,7 @@ def test_old_version_question_quoted_from_both_versions_is_rechecked_with_the_ol
             {"passage_id": 1, "quote": "Se permite teletrabajar hasta 2 días por semana."},
         ],
     }
-    old_only = {"reason": "La versión de 2023 lo indica.", "answers": True, "answer": "3 días"}
+    old_only = verdict("3 días")
     question = "¿Cuántos días de teletrabajo permitía la política de 2023?"
     client, calls = scripted(both, NO, old_only)
     text, _, meta = documentary_answer(client, question, sources)
@@ -433,7 +438,7 @@ def test_old_version_question_quoted_from_both_versions_is_rechecked_with_the_ol
 
 def test_an_answer_that_only_echoes_the_question_is_not_an_answer():
     sources = [{"content": "Las compras requieren aprobación de la responsable del workspace."}]
-    echo = {"reason": "x", "answers": True, "answer": "La responsable del workspace"}
+    echo = verdict("La responsable del workspace")
     client, _ = scripted(
         selection("Las compras requieren aprobación de la responsable del workspace."), echo
     )
@@ -446,7 +451,7 @@ def test_an_answer_that_only_echoes_the_question_is_not_an_answer():
 
 def test_a_yes_no_question_may_be_answered_with_its_own_words():
     sources = [{"content": "Los trayectos de más de 6 horas pueden reservarse en clase business."}]
-    yes = {"reason": "x", "answers": True, "answer": "business"}
+    yes = verdict("business")
     client, _ = scripted(
         selection("Los trayectos de más de 6 horas pueden reservarse en clase business."), yes
     )
@@ -454,3 +459,205 @@ def test_a_yes_no_question_may_be_answered_with_its_own_words():
         client, "¿Puedo volar en business en un trayecto largo?", sources
     )
     assert meta["abstention_reason"] is None
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("25 días laborables", [(25.0, "days")]),
+        ("treinta jornadas de descanso", [(30.0, "days")]),
+        ("una semana para entregarlo", [(7.0, "days")]),
+        ("dos semanas de margen", [(14.0, "days")]),
+        ("dieciocho euros", [(18.0, "euros")]),
+        ("treinta y cinco euros", [(35.0, "euros")]),
+        ("2.000 euros", [(2000.0, "euros")]),
+        ("del 2 % con un máximo del 10 %", [(2.0, "percent"), (10.0, "percent")]),
+        ("el formulario FOR-21 al menos 15 días antes", [(15.0, "days")]),
+        ("de 8:00 a 20:00", []),
+        ("un portátil y una pantalla", []),
+    ],
+)
+def test_measures_read_numbers_words_periods_and_units(text, expected):
+    from app.evidence import measures
+
+    assert measures(text) == expected
+
+
+def test_a_literal_quote_about_another_party_is_not_an_answer():
+    """The quote is real and literal, but it is about what a carrier charges the company."""
+    quote = "La tarifa que el transportista factura a la empresa es de 4,80 euros por bulto."
+    sources = [{"content": quote, "filename": "contrato.pdf"}]
+    client, calls = scripted(selection(quote), YES)
+    text, _, meta = documentary_answer(client, "¿Cuánto cuesta el envío a un cliente?", sources)
+    assert meta["abstention_reason"] == "missing_question_party" and calls == []
+    assert "[1]" not in text
+    # The same party named in the evidence (or in its file name) is answerable.
+    client, _ = scripted(selection(quote), verdict("4,80 euros por bulto"))
+    _, _, meta = documentary_answer(
+        client, "¿Cuánto cobra el transportista a la empresa por bulto?", sources
+    )
+    assert meta["abstention_reason"] is None
+
+
+@pytest.mark.parametrize(
+    "question,content,missing",
+    [
+        ("¿Qué descuento tienen los empleados?", "Los proveedores aplican un 12 %.", True),
+        ("¿Cuántos días tienen los becarios?", "Los directores disponen de 27 días.", True),
+        ("¿Cuántos días tienen los becarios?", "Los becarios disponen de 15 días.", False),
+        (
+            "¿Qué plazo tiene un cliente para devolver?",
+            "Los clientes pueden devolver en 30 días.",
+            False,
+        ),
+        ("¿Cuántos días de vacaciones tengo?", "Cada persona dispone de 23 días.", False),
+        (
+            "¿Puede la empresa cambiarme el turno?",
+            "El trabajador solicita el cambio con 7 días.",
+            True,
+        ),
+        # A generic party narrowed by its kind is named by that kind.
+        (
+            "¿Con cuánto preaviso se resuelve el contrato con el proveedor de transporte?",
+            "Contrato con Transportes Rápido Norte. Preaviso de 60 días.",
+            False,
+        ),
+        (
+            "¿Qué plazo tiene el proveedor de limpieza?",
+            "El transportista entrega en 48 horas.",
+            True,
+        ),
+        # Adjectives and possessives are not parties of the rule.
+        (
+            "¿Puedo usar mi USB personal en el portátil de la empresa?",
+            "Está prohibido conectar memorias USB personales.",
+            False,
+        ),
+        ("¿De cuánto es el seguro del transportista?", "Un seguro de 100.000 euros.", False),
+        (
+            "¿El personal de almacén puede teletrabajar?",
+            "El personal de almacén queda excluido.",
+            False,
+        ),
+    ],
+)
+def test_a_named_party_must_appear_in_the_evidence(question, content, missing):
+    from app.evidence import missing_party
+
+    assert missing_party(question, content) is missing
+
+
+def both_quoted(first, second, files=("a.txt", "b.txt")):
+    sources = [{"content": first, "filename": files[0]}, {"content": second, "filename": files[1]}]
+    decision = {
+        "status": "sufficient",
+        "evidence": [{"passage_id": 1, "quote": first}, {"passage_id": 2, "quote": second}],
+    }
+    return sources, decision
+
+
+def test_two_documents_with_different_amounts_for_one_datum_are_a_conflict():
+    sources, decision = both_quoted(
+        "Las vacaciones anuales son 25 días laborables.",
+        "Cada persona dispone de treinta jornadas de descanso al año.",
+    )
+    client, calls = scripted(decision, YES)
+    text, _, meta = documentary_answer(client, "¿Cuántos días de vacaciones hay?", sources)
+    assert meta["abstention_reason"] == "conflicting_evidence"
+    assert meta["assessment"]["numeric_conflict"] is True and len(calls) == 1
+    assert "[1]" not in text
+
+
+@pytest.mark.parametrize(
+    "question,first,second,files",
+    [
+        # The same amount said two ways is agreement.
+        (
+            "¿Cuántos días de vacaciones hay?",
+            "Son 25 días laborables.",
+            "Hay veinticinco jornadas de descanso.",
+            ("a.txt", "b.txt"),
+        ),
+        # A scope the question names appears in only one quote: different scopes.
+        (
+            "¿Cuál es el límite de alojamiento en Madrid?",
+            "En Madrid el límite es de 120 euros.",
+            "En el resto de España el límite es de 90 euros.",
+            ("a.txt", "b.txt"),
+        ),
+        # Two parts of one question legitimately have different amounts.
+        (
+            "¿Cuánto dura la formación y cuándo se hace?",
+            "La formación dura 4 horas.",
+            "Se hace en 2 horas por la tarde.",
+            ("a.txt", "b.txt"),
+        ),
+        # One document with two amounts is one rule, not a contradiction.
+        (
+            "¿Cuál es la penalización?",
+            "Penalización del 2 % por día.",
+            "Con un máximo del 10 % del importe.",
+            ("contrato.pdf", "contrato.pdf"),
+        ),
+        # Two documents about different subjects that share a verb ("reembolsar").
+        (
+            "¿En cuántos días me reembolsan una devolución?",
+            "El reembolso se realiza en 14 días.",
+            "Se abonan los gastos aprobados en 10 días.",
+            ("faq-clientes-devoluciones.md", "politica-gastos-viajes.pdf"),
+        ),
+        # Different units are different data.
+        (
+            "¿Cuánto es la dieta?",
+            "La dieta es de 14 euros.",
+            "Se abona en 14 días.",
+            ("a.txt", "b.txt"),
+        ),
+    ],
+)
+def test_amounts_that_do_not_contradict_each_other_are_not_a_conflict(
+    question, first, second, files
+):
+    from app.evidence import quoted_numeric_conflict
+
+    sources, decision = both_quoted(first, second, files)
+    quotes = {e["passage_id"]: [e["quote"]] for e in decision["evidence"]}
+    assert not quoted_numeric_conflict(question, quotes, sources)
+
+
+def test_a_quote_with_markdown_never_reaches_the_answer_as_markdown():
+    table = (
+        "# Devoluciones\n| Tipo | Plazo |\n|---|---|\n| Material de oficina | 14 días |\n"
+        "| Equipos electrónicos | 30 días |\nLos equipos electrónicos requieren el embalaje original."
+    )
+    sources = [{"content": table, "filename": "devoluciones.md"}]
+    raw_copy = table  # the model copies the whole chunk, heading and table rule included
+    client, _ = scripted(selection(raw_copy), verdict("30 días"))
+    text, _, meta = documentary_answer(
+        client, "¿Qué plazo de devolución tienen los equipos electrónicos?", sources
+    )
+    assert meta["abstention_reason"] is None
+    assert "# Devoluciones" not in text and "|---|" not in text
+    assert "| Equipos electrónicos | 30 días |" in text
+    from app.evaluate_local import literal_quotes
+
+    assert literal_quotes(text, {1: table}) == (1, True)
+
+
+def test_no_headline_is_read_from_a_whole_table():
+    table = (
+        "Importe del gasto | Quién aprueba\nHasta 300 euros | La persona responsable\n"
+        "Más de 300 y hasta 1.500 euros | Finanzas\nMás de 1.500 euros | Dirección general"
+    )
+    sources = [{"content": table, "filename": "gastos.pdf"}]
+    wrong_row = verdict("Dirección general")  # a small model may read the wrong row
+    client, _ = scripted(selection(table), wrong_row)
+    text, _, meta = documentary_answer(client, "¿Quién aprueba un gasto de 800 euros?", sources)
+    assert meta["abstention_reason"] is None and "answer_lead" not in meta
+    assert meta["answer_lead_withheld"] == "multi_unit_quote"
+    assert not text.startswith("Respuesta:") and "Finanzas" in text
+    # Quoting the single row keeps the headline.
+    row = "Más de 300 y hasta 1.500 euros | Finanzas"
+    client, _ = scripted(selection(row), verdict("Finanzas"))
+    text, _, meta = documentary_answer(client, "¿Quién aprueba un gasto de 800 euros?", sources)
+    assert text.startswith("Respuesta: Finanzas")

@@ -1,5 +1,5 @@
 "use client";
-import { memo, useEffect, useRef, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, Check, FileText, ShieldCheck, X } from "lucide-react";
 import type { PendingAction, Source } from "./product-types";
 
@@ -94,14 +94,39 @@ export function Inspector({
 }) {
   const root = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
+  const timer = useRef<number | null>(null);
+  const [closing, setClosing] = useState(false);
   useEffect(() => {
     closeRef.current = onClose;
   }, [onClose]);
+  // Leave along the path it came from, then unmount. A new subject while leaving (another
+  // citation clicked) cancels the exit: the CSS transition retargets back to open.
+  const requestClose = useCallback(() => {
+    if (timer.current !== null) return;
+    setClosing(true);
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      closeRef.current();
+    }, reduce ? 120 : 200);
+  }, []);
+  useEffect(() => {
+    if (timer.current === null) return;
+    window.clearTimeout(timer.current);
+    timer.current = null;
+    setClosing(false);
+  }, [title]);
+  useEffect(
+    () => () => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+    },
+    [],
+  );
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     root.current?.focus();
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeRef.current();
+      if (e.key === "Escape") requestClose();
       if (e.key === "Tab") {
         const elements = root.current?.querySelectorAll<HTMLElement>(
           'button:not([disabled]), a[href], input, select, textarea, summary, [tabindex="0"]',
@@ -129,9 +154,13 @@ export function Inspector({
       document.removeEventListener("keydown", key);
       previous?.focus();
     };
-  }, []);
+  }, [requestClose]);
   return (
-    <div className="inspectorBackdrop" onClick={onClose}>
+    <div
+      className="inspectorBackdrop"
+      data-state={closing ? "closing" : "open"}
+      onClick={requestClose}
+    >
       <div
         ref={root}
         className="inspector glass"
@@ -146,7 +175,7 @@ export function Inspector({
             <h2>{title}</h2>
             {subtitle && <p>{subtitle}</p>}
           </div>
-          <button className="iconButton" aria-label="Cerrar inspector" onClick={onClose}>
+          <button className="iconButton" aria-label="Cerrar inspector" onClick={requestClose}>
             <X size={20} />
           </button>
         </header>

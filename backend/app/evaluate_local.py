@@ -254,7 +254,7 @@ def classify_case(case):
         return "unsupported_answer"
     if case.get("literal_quotes_verified") is False:
         return "unsupported_answer"
-    if case.get("forbidden_terms_absent") is False:
+    if case.get("forbidden_terms_absent") is False or case.get("lead_correct") is False:
         return "incorrect_answer"
     if case.get("answer_terms_present") is False:
         return "incomplete_answer"
@@ -508,6 +508,11 @@ def run(*, credentials_file=None, cases_path=None):
                     answer = _fold(body["answer"])
                     if terms:
                         result["answer_terms_present"] = all(_fold(t) in answer for t in terms)
+                        # A headline is read as THE answer: it must carry an expected fact,
+                        # not merely a literal span that sits next to it in the quote.
+                        lead = re.match(r"Respuesta: (.+)", body["answer"])
+                        if lead:
+                            result["lead_correct"] = any(_fold(t) in _fold(lead[1]) for t in terms)
                     if case.get("forbidden_answer_terms"):
                         result["forbidden_terms_absent"] = not any(
                             _fold(t) in answer for t in case["forbidden_answer_terms"]

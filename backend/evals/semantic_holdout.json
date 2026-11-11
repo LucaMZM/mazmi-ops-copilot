@@ -1,0 +1,380 @@
+[
+ {
+  "name": "h_role_wholesale_vs_retail",
+  "question": "¿Qué precio paga un cliente particular por la caja de 12 unidades?",
+  "texts": [
+   "Tarifa mayorista: los distribuidores pagan 38 euros por la caja de 12 unidades."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "role_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_role_wholesale_ok",
+  "question": "¿Cuánto pagan los distribuidores por la caja de 12 unidades?",
+  "texts": [
+   "Tarifa mayorista: los distribuidores pagan 38 euros por la caja de 12 unidades."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "role_match",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_role_doctor_vs_patient",
+  "question": "¿Cuánto tiempo tiene el paciente para cancelar una cita?",
+  "texts": [
+   "El centro puede cancelar una cita avisando al paciente con 48 horas de antelación."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "role_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_role_patient_ok",
+  "question": "¿Con cuánta antelación debe cancelar su cita un paciente?",
+  "texts": [
+   "El centro puede cancelar una cita con 48 horas de antelación. El paciente debe cancelar con al menos 24 horas de antelación."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "role_match",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_role_contractor_vs_staff",
+  "question": "¿Qué seguro de accidentes cubre a los empleados?",
+  "texts": [
+   "Los contratistas externos deben aportar su propio seguro de accidentes con cobertura de 300.000 euros."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "role_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_role_teacher_vs_student",
+  "question": "¿Cuántas faltas puede tener un alumno antes de perder la evaluación continua?",
+  "texts": [
+   "El profesorado no puede acumular más de 5 ausencias sin justificar por trimestre."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "role_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_role_student_ok",
+  "question": "¿Cuántas faltas puede tener un alumno antes de perder la evaluación continua?",
+  "texts": [
+   "El alumnado pierde la evaluación continua al superar 8 faltas sin justificar."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "role_match",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_role_sender_vs_receiver",
+  "question": "¿Quién paga los portes cuando compramos material?",
+  "texts": [
+   "Cuando la empresa vende material, los portes corren a cargo del comprador."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "role_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_attr_start_vs_end",
+  "question": "¿Qué día empieza la campaña de inventario?",
+  "texts": [
+   "La campaña de inventario termina el 20 de diciembre."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "attribute_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_attr_ok",
+  "question": "¿Qué día termina la campaña de inventario?",
+  "texts": [
+   "La campaña de inventario termina el 20 de diciembre."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "role_match",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_cond_night_shift",
+  "question": "¿Cuál es el plus del turno de noche?",
+  "texts": [
+   "El turno de tarde tiene un plus de 2 euros por hora."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "condition_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_cond_weekend_ok",
+  "question": "¿Cuál es el plus por trabajar en fin de semana?",
+  "texts": [
+   "El trabajo en sábado o domingo tiene un plus de 30 euros por jornada."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "condition_match",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_conf_notice_words",
+  "question": "¿Con cuánto preaviso hay que comunicar la baja voluntaria?",
+  "texts": [
+   "La baja voluntaria se comunica con 15 días de antelación.",
+   "Quien quiera dejar la empresa debe avisar con un mes de margen."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "paraphrased_conflict",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_conf_capacity",
+  "question": "¿Cuál es el aforo máximo de la sala grande?",
+  "texts": [
+   "La sala grande admite un máximo de 40 personas.",
+   "En la sala grande no pueden reunirse más de sesenta asistentes."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "paraphrased_conflict",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_conf_owner",
+  "question": "¿Quién custodia las llaves del almacén?",
+  "texts": [
+   "Las llaves del almacén las guarda el jefe de turno.",
+   "La custodia de las llaves del almacén corresponde exclusivamente a Seguridad."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "paraphrased_conflict",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_conf_allowed",
+  "question": "¿Se pueden llevar mascotas a la oficina?",
+  "texts": [
+   "Se admiten mascotas en la oficina los viernes.",
+   "No está permitido acceder a las instalaciones con animales de compañía en ningún caso."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "paraphrased_conflict",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_conf_amount",
+  "question": "¿Cuánto es la dieta de comida?",
+  "texts": [
+   "La dieta de comida es de 14 euros.",
+   "Por cada almuerzo en desplazamiento se abonan dieciocho euros."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "paraphrased_conflict",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_agree_notice",
+  "question": "¿Con cuánto preaviso hay que comunicar la baja voluntaria?",
+  "texts": [
+   "La baja voluntaria se comunica con 15 días de antelación.",
+   "Quien quiera dejar la empresa debe avisar con quince días de margen."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "paraphrased_agreement",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_agree_capacity",
+  "question": "¿Cuál es el aforo máximo de la sala grande?",
+  "texts": [
+   "La sala grande admite un máximo de 40 personas.",
+   "En la sala grande no pueden reunirse más de cuarenta asistentes."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "paraphrased_agreement",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_distinct_rooms",
+  "question": "¿Cuál es el aforo máximo de la sala grande?",
+  "texts": [
+   "La sala grande admite un máximo de 40 personas.",
+   "La sala pequeña admite un máximo de 8 personas."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "different_scopes",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_distinct_facts",
+  "question": "¿Cuánto es la dieta de comida?",
+  "texts": [
+   "La dieta de comida es de 14 euros.",
+   "El kilometraje se abona a 0,26 euros por kilómetro."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "different_facts",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_complement",
+  "question": "¿Quién custodia las llaves del almacén y dónde se guardan?",
+  "texts": [
+   "Las llaves del almacén las guarda el jefe de turno.",
+   "Las llaves se depositan en la caja fuerte de recepción al terminar la jornada."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "complementary",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "h_exception_not_conflict",
+  "question": "¿Se pueden llevar mascotas a la oficina?",
+  "texts": [
+   "No se admiten mascotas en la oficina, salvo perros de asistencia."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "exception",
+  "baseline_answer": "Respuesta candidata [1]."
+ }
+]
