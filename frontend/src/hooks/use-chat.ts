@@ -85,7 +85,7 @@ export function useChat(options: { onSettled?: (result: ChatResult | null) => vo
       setError("");
       setRetry(null);
       setBusy("streaming");
-      setMessages((m) => [...m, { id: nextId(), role: "user", content: message }]);
+      setMessages((m) => [...m, { id: nextId(), role: "user", content: message, fresh: true }]);
       setDraft({ text: "", status: "Enviando consulta…" });
       let result: ChatResult | null = null;
       try {
@@ -209,7 +209,7 @@ export function useChat(options: { onSettled?: (result: ChatResult | null) => vo
       ...m.map((item) =>
         item.pending?.id === actionId ? { ...item, pending: undefined } : item,
       ),
-      { id: nextId(), role: "assistant", content: receipt },
+      { id: nextId(), role: "assistant", content: receipt, fresh: true },
     ]);
   }, []);
 

@@ -473,6 +473,7 @@ export function Copilot({
             aria-busy={data.initialLoading || viewBusy}
           >
             {feedback}
+            <div className="viewStage" key={view}>
             {view === "Workspace" && (
               <WorkspaceView
                 name={workspaceName}
@@ -532,6 +533,7 @@ export function Copilot({
                 onCheckLocal={checkLocalProvider}
               />
             )}
+            </div>
           </div>
         )}
       </section>

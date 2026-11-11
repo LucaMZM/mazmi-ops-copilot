@@ -53,6 +53,9 @@ export type Message = {
   sources?: Source[];
   pending?: PendingAction;
   failed?: boolean;
+  /** Created in this session by the person or by a decision: it may enter with motion.
+   *  History loaded from the server never animates. */
+  fresh?: boolean;
 };
 export type ProviderInfo = {
   provider: "ollama";

@@ -1,5 +1,5 @@
 "use client";
-import { memo } from "react";
+import { memo, useLayoutEffect, useRef } from "react";
 import {
   Bot,
   FileText,
@@ -53,6 +53,40 @@ export const Sidebar = memo(function Sidebar({
   onNewConversation,
   onSignOut,
 }: Props) {
+  const navRef = useRef<HTMLElement>(null);
+  const indicator = useRef<HTMLSpanElement>(null);
+  // One indicator travels to the active item (transform only). It follows layout changes
+  // (rail, drawer, tab bar) without animating them; only a change of section moves it.
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    const pill = indicator.current;
+    if (!nav || !pill) return;
+    const place = (animate: boolean) => {
+      const active = nav.querySelector<HTMLElement>(".nav.active");
+      pill.dataset.ready = animate ? "true" : "false";
+      if (!active) {
+        pill.style.opacity = "0";
+        return;
+      }
+      pill.style.opacity = "1";
+      pill.style.width = `${active.offsetWidth}px`;
+      pill.style.height = `${active.offsetHeight}px`;
+      pill.style.transform = `translate(${active.offsetLeft}px, ${active.offsetTop}px)`;
+    };
+    place(pill.dataset.section !== undefined && pill.dataset.section !== view);
+    pill.dataset.section = view;
+    // Resizes (rail, drawer, tab bar) reposition instantly; they are not navigation.
+    if (typeof ResizeObserver === "undefined") return;
+    let size = `${nav.clientWidth}x${nav.clientHeight}`;
+    const observer = new ResizeObserver(() => {
+      const next = `${nav.clientWidth}x${nav.clientHeight}`;
+      if (next === size) return;
+      size = next;
+      place(false);
+    });
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, [view, open]);
   return (
     <aside className={`sidebar glass ${open ? "open" : ""}`} aria-label="Navegación del workspace">
       <div className="brand">
@@ -84,7 +118,8 @@ export const Sidebar = memo(function Sidebar({
           </select>
         </span>
       </label>
-      <nav className="primaryNav" aria-label="Secciones">
+      <nav ref={navRef} className="primaryNav hasIndicator" aria-label="Secciones">
+        <span ref={indicator} className="navIndicator" aria-hidden="true" />
         {NAV_ITEMS.map(({ view: next, label, icon: Icon }) => (
           <button
             key={next}
