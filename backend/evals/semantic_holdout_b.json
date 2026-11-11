@@ -1,0 +1,331 @@
+[
+ {
+  "name": "r2_role_landlord_vs_tenant",
+  "question": "¿Cuánto paga el inquilino de fianza?",
+  "texts": [
+   "El propietario deposita la fianza del local en el organismo autonómico en un plazo de 30 días."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "role_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_role_tenant_ok",
+  "question": "¿Cuántas mensualidades de fianza entrega el inquilino?",
+  "texts": [
+   "El inquilino entrega una fianza de dos mensualidades al firmar el contrato."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "role_match",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_role_buyer_vs_seller",
+  "question": "¿Qué plazo tiene el proveedor para entregar el pedido?",
+  "texts": [
+   "El cliente dispone de 15 días para pagar el pedido desde la entrega."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "role_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_role_seller_ok",
+  "question": "¿Qué plazo tiene el cliente para pagar el pedido?",
+  "texts": [
+   "El cliente dispone de 15 días para pagar el pedido desde la entrega."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "role_match",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_role_driver_vs_company",
+  "question": "¿Quién paga las multas de aparcamiento del vehículo de empresa?",
+  "texts": [
+   "La empresa paga el seguro y el mantenimiento del vehículo de empresa."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "attribute_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_role_payer_ok",
+  "question": "¿Quién paga las multas de tráfico del vehículo de empresa?",
+  "texts": [
+   "Las multas de tráfico las paga la persona que conducía el vehículo de empresa."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "role_match",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_attr_open_vs_close",
+  "question": "¿A qué hora cierra el almacén los sábados?",
+  "texts": [
+   "Los sábados el almacén abre a las 9:00."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "attribute_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_attr_min_vs_max",
+  "question": "¿Cuál es el pedido mínimo para envío gratuito?",
+  "texts": [
+   "El pedido máximo por cliente es de 500 unidades."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "attribute_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_cond_remote_vs_office",
+  "question": "¿Qué horario tiene quien teletrabaja?",
+  "texts": [
+   "En la oficina el horario es de 9:00 a 18:00."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "condition_mismatch",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_cond_general_ok",
+  "question": "¿Qué horario hay en la oficina?",
+  "texts": [
+   "En la oficina el horario es de 9:00 a 18:00."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "condition_match",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_conf_words_days",
+  "question": "¿Cuántos días tarda el reembolso?",
+  "texts": [
+   "El reembolso se realiza en 10 días.",
+   "El dinero se devuelve en un plazo de catorce días."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "paraphrased_conflict",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_conf_week_vs_days",
+  "question": "¿Con cuánta antelación se piden los permisos?",
+  "texts": [
+   "Los permisos se solicitan con 3 días de antelación.",
+   "Cualquier permiso debe pedirse con dos semanas de margen."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "paraphrased_conflict",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_conf_negation",
+  "question": "¿Se reembolsan los taxis?",
+  "texts": [
+   "Los taxis se reembolsan presentando el ticket.",
+   "No se abona ningún gasto de taxi en ningún caso."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "paraphrased_conflict",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_conf_actor",
+  "question": "¿Quién autoriza las horas extra?",
+  "texts": [
+   "Las horas extra las autoriza el responsable directo.",
+   "Solo Recursos Humanos puede autorizar horas extraordinarias; el responsable directo no puede."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": true,
+  "check": "paraphrased_conflict",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_agree_words",
+  "question": "¿Cuántos días tarda el reembolso?",
+  "texts": [
+   "El reembolso se realiza en 14 días.",
+   "El dinero se devuelve en un plazo de catorce días."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "paraphrased_agreement",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_agree_week",
+  "question": "¿Con cuánta antelación se piden los permisos?",
+  "texts": [
+   "Los permisos se solicitan con 14 días de antelación.",
+   "Cualquier permiso debe pedirse con dos semanas de margen."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "paraphrased_agreement",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_distinct_topics",
+  "question": "¿Cuántos días tarda el reembolso?",
+  "texts": [
+   "El reembolso se realiza en 14 días.",
+   "La garantía de los productos es de 2 años."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "different_facts",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_distinct_groups",
+  "question": "¿Cuántos días de teletrabajo tiene el equipo de ventas?",
+  "texts": [
+   "El equipo de ventas puede teletrabajar 1 día por semana.",
+   "El equipo de tecnología puede teletrabajar 3 días por semana."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "different_scopes",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_complement",
+  "question": "¿Cuándo y dónde se recogen los paquetes?",
+  "texts": [
+   "Los paquetes se recogen de lunes a viernes.",
+   "La recogida de paquetes se hace en el muelle 2."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "complementary",
+  "baseline_answer": "Respuesta candidata [1]."
+ },
+ {
+  "name": "r2_exception_ok",
+  "question": "¿Se puede aparcar en la zona de carga?",
+  "texts": [
+   "Está prohibido aparcar en la zona de carga, salvo vehículos de reparto durante la descarga."
+  ],
+  "decision": {
+   "status": "sufficient",
+   "passage_ids": [
+    1
+   ]
+  },
+  "expected_abstention": false,
+  "check": "exception",
+  "baseline_answer": "Respuesta candidata [1]."
+ }
+]
