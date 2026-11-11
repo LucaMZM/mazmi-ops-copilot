@@ -1,0 +1,194 @@
+{
+  "purpose": "Corpus ficticio realista de Aurelia Logística. Segundo conjunto reservado: escrito tras ver el primero y antes de corregir sus fallos; solo se ejecuta en la medición final.",
+  "documents": [
+    {
+      "filename": "comunicado-comedor.txt",
+      "file": "corpus/comunicado-comedor.txt"
+    },
+    {
+      "filename": "contrato-transportes-rapido-norte.pdf",
+      "file": "corpus/contrato-transportes-rapido-norte.pdf"
+    },
+    {
+      "filename": "faq-clientes-devoluciones.md",
+      "file": "corpus/faq-clientes-devoluciones.md"
+    },
+    {
+      "filename": "manual-empleado-2025.docx",
+      "file": "corpus/manual-empleado-2025.docx"
+    },
+    {
+      "filename": "onboarding-nuevas-incorporaciones.txt",
+      "file": "corpus/onboarding-nuevas-incorporaciones.txt"
+    },
+    {
+      "filename": "politica-gastos-viajes.pdf",
+      "file": "corpus/politica-gastos-viajes.pdf"
+    },
+    {
+      "filename": "politica-seguridad-informacion.md",
+      "file": "corpus/politica-seguridad-informacion.md"
+    },
+    {
+      "filename": "politica-teletrabajo-2023.pdf",
+      "file": "corpus/politica-teletrabajo-2023.pdf"
+    },
+    {
+      "filename": "politica-teletrabajo-2025.md",
+      "file": "corpus/politica-teletrabajo-2025.md"
+    },
+    {
+      "filename": "procedimiento-incidencias-ti.docx",
+      "file": "corpus/procedimiento-incidencias-ti.docx"
+    }
+  ],
+  "questions": [
+    {
+      "name": "b_lunch_break",
+      "question": "¿Cuánto dura como mínimo la pausa para comer?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "manual-empleado-2025.docx"
+      ],
+      "expected_answer_terms": [
+        "30 minutos"
+      ]
+    },
+    {
+      "name": "b_summer_hours",
+      "question": "¿Qué horario hay en julio y agosto?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "manual-empleado-2025.docx"
+      ],
+      "expected_answer_terms": [
+        "8:00",
+        "15:00"
+      ]
+    },
+    {
+      "name": "b_expense_deadline",
+      "question": "¿Cuánto tiempo tengo para presentar los gastos de un viaje?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-gastos-viajes.pdf"
+      ],
+      "expected_answer_terms": [
+        "30 días"
+      ]
+    },
+    {
+      "name": "b_hotel_outside_europe",
+      "question": "¿Cuál es el límite de alojamiento por noche fuera de Europa?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-gastos-viajes.pdf"
+      ],
+      "expected_answer_terms": [
+        "200 euros"
+      ]
+    },
+    {
+      "name": "b_expense_refund",
+      "question": "¿En cuánto tiempo me devuelven los gastos de viaje aprobados?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-gastos-viajes.pdf"
+      ],
+      "expected_answer_terms": [
+        "10 días laborables"
+      ]
+    },
+    {
+      "name": "b_parcel_rate",
+      "question": "¿Cuál es la tarifa del transportista por bulto en la península?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "contrato-transportes-rapido-norte.pdf"
+      ],
+      "expected_answer_terms": [
+        "4,80 euros"
+      ]
+    },
+    {
+      "name": "b_serious_breach",
+      "question": "¿Con qué plazo se puede resolver el contrato de transporte por un incumplimiento grave?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "contrato-transportes-rapido-norte.pdf"
+      ],
+      "expected_answer_terms": [
+        "15 días"
+      ]
+    },
+    {
+      "name": "b_canary_delivery",
+      "question": "¿Cuánto tiempo tiene el proveedor de transporte para entregar en Canarias?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "contrato-transportes-rapido-norte.pdf"
+      ],
+      "expected_answer_terms": [
+        "5 días laborables"
+      ]
+    },
+    {
+      "name": "b_visitor_card",
+      "question": "¿Qué tienen que hacer los visitantes con la tarjeta temporal al salir?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "politica-seguridad-informacion.md"
+      ],
+      "expected_answer_terms": [
+        "devuelven la tarjeta temporal"
+      ]
+    },
+    {
+      "name": "b_password_reset",
+      "question": "¿Cómo restablezco mi contraseña?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "procedimiento-incidencias-ti.docx"
+      ],
+      "expected_answer_terms": [
+        "portal de autoservicio"
+      ]
+    },
+    {
+      "name": "b_new_equipment",
+      "question": "¿Con cuánta antelación hay que pedir un equipo nuevo?",
+      "expected_abstention": false,
+      "expected_documents": [
+        "procedimiento-incidencias-ti.docx"
+      ],
+      "expected_answer_terms": [
+        "10 días laborables"
+      ]
+    },
+    {
+      "name": "b_neg_customer_late_penalty",
+      "question": "¿Cuánto se compensa a un cliente si su pedido llega tarde?",
+      "expected_abstention": true,
+      "expected_documents": [],
+      "note": "La penalización por retraso la paga el transportista a la empresa, no se compensa al cliente."
+    },
+    {
+      "name": "b_neg_canteen_weekend",
+      "question": "¿Qué horario tiene el comedor los fines de semana?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "b_neg_training_hours",
+      "question": "¿Cuántas horas de formación al año tiene cada empleado?",
+      "expected_abstention": true,
+      "expected_documents": []
+    },
+    {
+      "name": "b_neg_mobile_allowance",
+      "question": "¿Cuánto paga la empresa por el teléfono móvil de cada empleado?",
+      "expected_abstention": true,
+      "expected_documents": []
+    }
+  ]
+}
