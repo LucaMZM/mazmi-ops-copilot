@@ -186,7 +186,7 @@ def test_failed_journey_preserves_operation_without_secrets_or_resource_ids(path
 REALISTIC = evaluation.EVALS / "realistic"
 
 
-@pytest.mark.parametrize("name", ["cases.json", "holdout.json"])
+@pytest.mark.parametrize("name", ["cases.json", "holdout.json", "holdout_b.json"])
 def test_realistic_datasets_are_answerable_from_the_extracted_text(name):
     """A typo in a fixture would silently turn a product failure into a dataset failure.
 
