@@ -8,4 +8,4 @@ Capturas reales tomadas el 11 de noviembre de 2026 con Playwright (Chromium) sob
 
 Sin modo demo, sin claves y sin retoque ni composición: PNG escrito directamente por el navegador. Escritorio a 1440 × 900 en tema claro y oscuro; móvil a 390 × 844, sin desbordamiento horizontal medido.
 
-Son pasos sucesivos de un mismo recorrido: la propuesta de `approvals.png` se confirmó después, como se ve en `copilot.png`.
+Rehechas con la paleta en escala de grises. Son pasos sucesivos de un mismo recorrido: la propuesta de `approvals.png` (carretilla del muelle 2) se rechazó justo después de la captura para no dejar nada pendiente; la del muelle 3 se había confirmado antes.
