@@ -38,8 +38,16 @@ export function useTheme(): [ThemePreference, (value: ThemePreference) => void] 
     } catch {
       // Storage may be blocked (private mode); the choice still applies to this page.
     }
-    applyTheme(value);
-    listeners.forEach((listener) => listener());
+    // A light/dark switch is an abrupt brightness jump: crossfade it where supported, except
+    // with reduced motion. The change itself is synchronous either way.
+    const swap = () => {
+      applyTheme(value);
+      listeners.forEach((listener) => listener());
+    };
+    const doc = document as Document & { startViewTransition?: (update: () => void) => unknown };
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (doc.startViewTransition && !reduce) doc.startViewTransition(swap);
+    else swap();
   }, []);
   return [theme, set];
 }

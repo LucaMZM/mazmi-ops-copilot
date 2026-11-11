@@ -24,7 +24,9 @@ export const MessageItem = memo(function MessageItem({
   );
   const verificationFailure = m.content.startsWith("No he podido completar la comprobación");
   return (
-    <article className={`messageRow ${m.role} ${m.failed ? "failed" : ""}`}>
+    <article
+      className={`messageRow ${m.role} ${m.failed ? "failed" : ""} ${m.fresh ? "enter" : ""}`}
+    >
       <div className="messageIdentity">
         {m.role === "user" ? "Tú" : "MAZMI"}
         {m.role === "assistant" && m.sources?.length ? (

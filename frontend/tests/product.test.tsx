@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import { Copilot } from "../src/components/copilot";
 import { AnswerText, Inspector } from "../src/components/product-ui";
+import { MessageItem } from "../src/components/chat/message-item";
 import type { SystemInfo } from "../src/components/product-types";
 const account = {
   email: "ana@test.local",
@@ -194,7 +195,7 @@ test("document inspector calls scoped chunk endpoint and supports keyboard dismi
   await screen.findByText("Pasaje verificable y completo");
   expect(screen.getByRole("dialog")).toHaveTextContent("Vacaciones.txt");
   fireEvent.keyDown(document, { key: "Escape" });
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 });
 test("canceling reindex confirmation sends no mutation", async () => {
   const fetcher = mockBase();
@@ -276,11 +277,38 @@ test("inspector traps focus and returns to trigger when closed", () => {
   expect(dialog).toHaveFocus();
   fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
   expect(screen.getByText("Inside")).toHaveFocus();
+  vi.useFakeTimers();
   fireEvent.keyDown(document, { key: "Escape" });
+  // The sheet leaves first; the parent is told to unmount it once the exit has played.
+  expect(document.querySelector(".inspectorBackdrop")).toHaveAttribute("data-state", "closing");
+  expect(close).not.toHaveBeenCalled();
+  fireEvent.keyDown(document, { key: "Escape" });
+  vi.advanceTimersByTime(250);
   expect(close).toHaveBeenCalledOnce();
+  vi.useRealTimers();
   unmount();
   expect(button).toHaveFocus();
   button.remove();
+});
+test("a new subject while the inspector is leaving cancels the exit", () => {
+  vi.useFakeTimers();
+  const close = vi.fn();
+  const { rerender } = render(
+    <Inspector title="Uno" onClose={close}>
+      <p>Uno</p>
+    </Inspector>,
+  );
+  fireEvent.click(screen.getByLabelText("Cerrar inspector"));
+  expect(document.querySelector(".inspectorBackdrop")).toHaveAttribute("data-state", "closing");
+  rerender(
+    <Inspector title="Dos" onClose={close}>
+      <p>Dos</p>
+    </Inspector>,
+  );
+  vi.advanceTimersByTime(400);
+  expect(close).not.toHaveBeenCalled();
+  expect(document.querySelector(".inspectorBackdrop")).toHaveAttribute("data-state", "open");
+  vi.useRealTimers();
 });
 test("unreachable Ollama error preserves the draft for retry", async () => {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
@@ -621,4 +649,25 @@ test("a verified answer lead is highlighted above its literal evidence", () => {
   expect(screen.getByText("Respuesta")).toBeInTheDocument();
   expect(screen.getByText("23 días laborables", { selector: "strong" })).toBeInTheDocument();
   expect(screen.getByText(/Cada persona dispone/)).toBeInTheDocument();
+});
+
+test("only messages created in this session enter with motion; history does not", () => {
+  render(
+    <>
+      <MessageItem
+        message={{ id: "h", role: "user", content: "Pregunta anterior" }}
+        deciding={false}
+        onSource={() => undefined}
+        onDecide={() => undefined}
+      />
+      <MessageItem
+        message={{ id: "n", role: "user", content: "Pregunta nueva", fresh: true }}
+        deciding={false}
+        onSource={() => undefined}
+        onDecide={() => undefined}
+      />
+    </>,
+  );
+  expect(screen.getByText("Pregunta anterior").closest("article")).not.toHaveClass("enter");
+  expect(screen.getByText("Pregunta nueva").closest("article")).toHaveClass("enter");
 });
