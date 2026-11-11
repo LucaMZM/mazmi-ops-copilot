@@ -1,6 +1,6 @@
 # Validación de MAZMI Ops Copilot con IA local
 
-Medido el 10 de noviembre de 2026 en un MacBook Air M2 de **8 GB**, con Ollama 0.40.7, `qwen3:4b` (Q4_K_M) y `embeddinggemma`, PostgreSQL 17 con pgvector y bases nuevas y vacías. El registro de MAZMI 2.0 (Gemini, demo y mediciones anteriores) está en [docs/HISTORICO-VALIDACION-2.0.md](docs/HISTORICO-VALIDACION-2.0.md); los resultados en bruto, en `backend/evals/v3-*.json`.
+Medido el 10 y el 11 de noviembre de 2026 en un MacBook Air M2 de **8 GB**, con Ollama 0.40.7, `qwen3:4b` (Q4_K_M) y `embeddinggemma`, PostgreSQL 17 con pgvector y bases nuevas y vacías. El registro de MAZMI 2.0 (Gemini, demo y mediciones anteriores) está en [docs/HISTORICO-VALIDACION-2.0.md](docs/HISTORICO-VALIDACION-2.0.md); los resultados en bruto, en `backend/evals/v3-*.json`, `v4-*.json` y `v5-*.json` (los más recientes).
 
 ## Categorías de evidencia
 
@@ -10,6 +10,83 @@ Medido el 10 de noviembre de 2026 en un MacBook Air M2 de **8 GB**, con Ollama 0
 | Integración con PostgreSQL real | Aislamiento por workspace, colecciones, idempotencia, atomicidad | Calidad del modelo |
 | Modelo real, pasajes fijos (`evaluate_grounding --live`) | Juicio de suficiencia con casos adversariales | Recuperación ni embeddings |
 | Modelo real, pipeline completo (`evaluate_local --live`) | HTTP, base real, embeddings, citas, ASK/DO, aprobaciones, tiempos, memoria | Generalización: los corpus son pequeños y ficticios |
+
+## Fase de cierre (11 de noviembre): semántica, navegador y movimiento
+
+### Roles y conflictos parafraseados
+
+Objetivo: que una cita literal no se acepte como respuesta cuando habla de **otra parte** (lo que el transportista cobra a la empresa no es lo que paga un cliente), y que dos documentos con **cantidades distintas dichas con otras palabras** («25 días» frente a «treinta jornadas») se traten como conflicto. Se escribieron 65 casos adversariales en tres conjuntos de pasajes fijos, con controles positivos para detectar falsas abstenciones. Dos conjuntos son reservados: uno se fijó antes de cambiar nada y el segundo antes de corregir los fallos vistos en el primero.
+
+**Dos intentos descartados (con sus resultados guardados):**
+
+| Intento | Semántico de desarrollo | Corpus realista de desarrollo | Decisión |
+|---|---:|---:|---|
+| Línea base (PR #3) | 18/22 | 34/35 | — |
+| El modelo juzga «mismo sujeto» y consistencia | 20/22 | **27/35** | Descartado: Qwen3 4B rechaza preguntas legítimas |
+| Campo de pasajes en la selección + comparación numérica sobre valores del modelo | 20/22 | **23/35** | Descartado |
+| **Reglas deterministas (final)** | 19/22 | **35/35** | Adoptado |
+
+**Solución adoptada**, sin depender del juicio del modelo:
+
+1. **Parte nombrada:** si la pregunta nombra a una parte que actúa o recibe (cliente, empleado, empresa, proveedor, transportista, becario…), la evidencia, su archivo o su sección deben nombrarla. Los posesivos y adjetivos no cuentan («el portátil de la empresa», «USB personal»), y «el proveedor de transporte» queda nombrado por «transportista».
+2. **Conflicto entre documentos:** si el modelo cita dos documentos con cantidades distintas en la misma unidad, aunque estén escritas con letras o como periodos («una semana» = 7 días), se informa de un conflicto. No cuenta en preguntas de varias partes, dentro de un mismo documento, entre versiones de una política, cuando un ámbito nombrado (ciudad, equipo, código) solo aparece en una cita, ni entre documentos de temas distintos (devolución de un pedido frente a reembolso de gastos).
+
+| Conjunto (Ollama real) | Correctos | Sin soporte | Falsas abstenciones |
+|---|---:|---:|---:|
+| Semántico de desarrollo (22) | 19 | 1 | 2 |
+| Semántico reservado 1 (23, analizado tras medirlo) | 20 (antes 18) | 3 (antes 4) | 0 (antes 1) |
+| **Semántico reservado 2 (20, nunca visto)** | **18** | **2** | **0** |
+| Adversarial de pasajes fijos (27) | **26** (antes 25; `paraphrased_conflict` resuelto) | 0 | 1 |
+
+**Lo que sigue sin resolver** (límite medido de Qwen3 4B; las reglas no lo cubren y no se forzaron):
+
+- Conflictos sin cantidades: «permitido» frente a «prohibido», o quién custodia o autoriza algo.
+- Un plazo dicho con otras palabras cuando el modelo solo cita uno de los dos documentos (`d_conf_deadline`, `r2_conf_week_vs_days`).
+- Una pregunta que sugiere su propia respuesta («¿quién paga, el inquilino?») se abstiene aunque el documento diga «el propietario».
+
+### Corpus realista con el código final
+
+| Conjunto realista | Resultado | Titulares correctos | Citas literales | Seguridad | p50 / p95 |
+|---|---:|---:|:---:|---:|---:|
+| Desarrollo (35) | **35/35** (antes 34/35) | 16/16 | sí | 13/13 | 11,2 s / 16,7 s |
+| Reservado 1 (25) | **25/25** | 11/11 | sí | 13/13 | 15,5 s / 20,7 s |
+| **Reservado 2 (15, nunca visto)** | **15/15** | 9/9 | sí | 13/13 | 11,7 s / 15,6 s |
+| Originales (8) | **8/8** | — | sí | 13/13 | 11,6 s / 19,1 s |
+
+La versión intermedia rebajó el reservado 1 a 23/25 («el proveedor de transporte» no se reconocía; dos reembolsos de temas distintos se tomaron por conflicto). Se escribió el reservado 2 antes de corregirlo; con la corrección, ambos quedan completos.
+
+### Regresiones encontradas en navegador y corregidas
+
+- **Titular incorrecto con evidencia correcta.** A «¿quién aprueba un gasto de 800 euros?», el modelo citó la tabla entera y el titular decía «Dirección general» (es Finanzas). Ahora la línea breve solo se muestra si cada cita es una única frase o fila. El evaluador cuenta un titular sin el dato esperado como respuesta incorrecta: tras el cambio, 36/36 titulares correctos.
+- **Cita con sintaxis Markdown.** Una cita verificada que abarcaba un encabezado y la línea `|---|` de una tabla se mostraba tal cual. Ahora se muestran las frases almacenadas que cubre.
+- **Barra de pestañas del móvil fuera de sitio.** Una regla del indicador de navegación anulaba su `position: fixed`. Detectado en la captura y corregido.
+
+### Navegador real (build de producción, Playwright/Chromium)
+
+- **Flujo completo:** registro, carga del corpus con `python -m app.presentation_corpus` (10/10 documentos listos) y cambio de workspace.
+- **Streaming:** estados intermedios visibles y botón «Detener» desde el primer instante. La cancelación retira el borrador en 132 ms y la consulta cancelada no se guarda.
+- **Respuestas:** coloquial (15 días naturales), tramo de tabla (Finanzas, en consulta nueva), versión vigente (2 días) e histórica (3 días, marcada como sustituida).
+- **Abstenciones:** transportista frente a cliente, y comunicado con instrucción dirigida al asistente.
+- **Acciones:** propuesta DO en 5,5 s, confirmación, ticket ejecutado una vez (repetir devuelve 409) y auditoría registrada.
+- **Persistencia:** las conversaciones siguen ahí tras recargar.
+- **Calentamiento:** sin modelos cargados, el backend los carga al arrancar (`Ollama warm-up: 2 of 2 models loaded`).
+- **Presentación:** tema claro y oscuro, móvil 390 × 844 sin desbordamiento, movimiento reducido (sin desplazamientos, solo fundidos) y transparencia reducida.
+- **Limitación observada:** en una conversación larga que salta de tema, el historial entra en la recuperación y el sistema puede abstenerse. En una consulta nueva responde.
+
+### Movimiento y rendimiento (frontend nuevo frente a `main`, mismos datos)
+
+Auditoría con las skills de [emilkowalski/skills](https://github.com/emilkowalski/skills) (`review-animations`, `improve-animations`, `animation-performance`, `apple-design`).
+
+| Medida | `main` | Nuevo |
+|---|---:|---:|
+| Mensajes animados al abrir una conversación de 14 | 14 | **0** |
+| Salida del inspector | instantánea | 180 ms interrumpible |
+| 30 cambios de vista: fotogramas largos / p95 | 0 / 18,6 ms | 0 / 18,6 ms |
+| Inspector abierto y cerrado 4 veces: p95 | 18,3 ms | 18,7 ms |
+| Scroll del chat con borde difuminado: p95 | 18,3 ms | 18,7 ms |
+| CSS / JS comprimidos | 10,6 / 194,8 KB | 11,5 / 195,2 KB |
+
+Las medidas son de Chromium sin interfaz en el mismo Mac (refresco a 60 Hz) y no sustituyen una prueba en dispositivos reales.
 
 ## Prueba con un corpus realista (PDF, DOCX, tablas y versiones)
 
@@ -98,8 +175,8 @@ La latencia incluye recuperación (unos milisegundos de SQL y ~80 ms de embeddin
 
 ## Pruebas automáticas
 
-- Backend: **335 pruebas** (PostgreSQL real con esquemas aislados), `ruff` limpio. Incluye aislamiento por workspace, aprobación única por solicitante, ASK sin mutación, transacciones sin bloqueos durante la inferencia, idempotencia, streaming y 22 pruebas del modo de evidencia verificada (citas inventadas, citas de otro pasaje, reintento, ajuste, instrucciones incrustadas, fallos del evaluador).
-- Frontend: **45 pruebas**, `tsc`, ESLint y `next build`. Comprueban que no queda ninguna etiqueta de demo, simulación ni proveedor externo.
+- Backend: **371 pruebas** (PostgreSQL real con esquemas aislados), `ruff` limpio. Incluye aislamiento por workspace, aprobación única por solicitante, ASK sin mutación, transacciones sin bloqueos durante la inferencia, idempotencia, streaming y 22 pruebas del modo de evidencia verificada (citas inventadas, citas de otro pasaje, reintento, ajuste, instrucciones incrustadas, fallos del evaluador).
+- Frontend: **47 pruebas**, `tsc`, ESLint y `next build`. Comprueban que no queda ninguna etiqueta de demo, simulación ni proveedor externo.
 - Sin `TEST_DATABASE_URL` las pruebas de integración se omiten y no se dan por pasadas. Las pruebas normales no llaman a ningún modelo ni descargan nada.
 
 ## Recuperación con EmbeddingGemma (se mantiene)
@@ -134,15 +211,16 @@ Un `v1.0.0` exige cumplirlos **todos**:
 | Criterio | Estado |
 |---|---|
 | Los conjuntos pequeños y el reservado realista superan `automated_fixture_checks_passed` | ✅ cumplido |
-| Cero respuestas sin soporte en los conjuntos de pipeline | ❌ **1 abierto** en desarrollo realista (`neg_customer_shipping_fee`) |
+| Cero respuestas sin soporte en los conjuntos de pipeline | ✅ cumplido (35/35, 25/25, 15/15, 8/8) |
 | Toda cita mostrada es literal | ✅ cumplido (todas las respuestas medidas) |
 | Cero timeouts y errores técnicos | ✅ cumplido |
 | Cero falsas abstenciones en los conjuntos de pipeline | ✅ cumplido |
-| Cero respuestas sin soporte en el corpus adversarial de pasajes fijos | ❌ **1 abierto** (`paraphrased_conflict`) |
-| Evaluación con documentos reales de una organización | ❌ no realizada (corpus realista pero ficticio, 92 preguntas en total) |
+| Cero respuestas sin soporte en el corpus adversarial de pasajes fijos | ✅ cumplido (26/27; el fallo restante es una abstención) |
+| Cero respuestas sin soporte en los conjuntos semánticos reservados | ❌ **2 de 20** en el reservado nunca visto (conflictos parafraseados) |
+| Evaluación con documentos reales de una organización | ❌ no realizada (corpus realista pero ficticio) |
 | Voz (Faster-Whisper/Piper) comprobada de extremo a extremo | ❌ no verificada |
 
-**Decisión: no se crea tag ni release.** Se han resuelto los fallos del modelo local que bloqueaban 2.0, pero queda una respuesta sin soporte reproducible y la validación es pequeña y sintética.
+**Decisión: no se crea tag ni release.** El corpus realista y los conjuntos de pipeline no tienen respuestas sin soporte, pero el conjunto semántico reservado aún tiene 2 de 20 (conflictos parafraseados sin cantidades o con una sola cita), y no hay validación con documentos reales de una organización.
 
 ## Comparación con otros modelos
 
@@ -150,7 +228,9 @@ No se ha descargado ningún modelo. Qwen3 8B (≈5 GB cuantizado) apenas cabría
 
 ## Pendiente y no verificado
 
-- Conflictos parafraseados entre pasajes (`paraphrased_conflict`) y distinguir a quién se aplica un dato (`neg_customer_shipping_fee`).
+- Conflictos parafraseados sin cantidades («permitido» frente a «prohibido», quién custodia o autoriza algo) y plazos dichos con otras palabras cuando el modelo cita solo un documento.
+- Preguntas que sugieren su propia respuesta («¿quién paga, el inquilino?»): abstención falsa.
+- Conversaciones largas que saltan de tema: el historial entra en la recuperación y puede provocar abstenciones.
 - Corpus mayores y documentos reales; recuperación a gran escala.
 - Voz real de extremo a extremo.
 - Comparación con un modelo mayor (requiere tu autorización y espacio/memoria).
