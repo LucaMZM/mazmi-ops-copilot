@@ -1,6 +1,6 @@
 {
   "mode": "live-ollama-http-pipeline-real-postgresql",
-  "created_at_utc": "2026-11-11T17:49:57.992223+00:00",
+  "created_at_utc": "2026-11-11T18:45:12.590072+00:00",
   "generation_model": "qwen3:4b",
   "embedding_model": "embeddinggemma",
   "embedding_dimensions": 768,
@@ -12,69 +12,69 @@
       "fixture": "comunicado-comedor.txt",
       "http_status": 200,
       "ready": true,
-      "duration_ms": 560.61
+      "duration_ms": 163.02
     },
     {
       "fixture": "contrato-transportes-rapido-norte.pdf",
       "http_status": 200,
       "ready": true,
-      "duration_ms": 221.9
+      "duration_ms": 197.9
     },
     {
       "fixture": "faq-clientes-devoluciones.md",
       "http_status": 200,
       "ready": true,
-      "duration_ms": 279.27
+      "duration_ms": 122.36
     },
     {
       "fixture": "manual-empleado-2025.docx",
       "http_status": 200,
       "ready": true,
-      "duration_ms": 407.21
+      "duration_ms": 225.93
     },
     {
       "fixture": "onboarding-nuevas-incorporaciones.txt",
       "http_status": 200,
       "ready": true,
-      "duration_ms": 107.02
+      "duration_ms": 92.58
     },
     {
       "fixture": "politica-gastos-viajes.pdf",
       "http_status": 200,
       "ready": true,
-      "duration_ms": 264.36
+      "duration_ms": 223.06
     },
     {
       "fixture": "politica-seguridad-informacion.md",
       "http_status": 200,
       "ready": true,
-      "duration_ms": 175.81
+      "duration_ms": 173.98
     },
     {
       "fixture": "politica-teletrabajo-2023.pdf",
       "http_status": 200,
       "ready": true,
-      "duration_ms": 98.75
+      "duration_ms": 98.74
     },
     {
       "fixture": "politica-teletrabajo-2025.md",
       "http_status": 200,
       "ready": true,
-      "duration_ms": 193.68
+      "duration_ms": 177.94
     },
     {
       "fixture": "procedimiento-incidencias-ti.docx",
       "http_status": 200,
       "ready": true,
-      "duration_ms": 171.95
+      "duration_ms": 170.53
     }
   ],
   "cases": [
     {
       "name": "h_weekly_hours",
       "expected_abstention": false,
-      "duration_ms": 12504.76,
-      "peak_ollama_rss_mb": 3715.7,
+      "duration_ms": 12633.29,
+      "peak_ollama_rss_mb": 3553.5,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -93,12 +93,12 @@
         "eval_count": 68,
         "done_reason": "stop",
         "content_chars": 227,
-        "eval_duration": 2816304000,
-        "load_duration": 3494875,
+        "eval_duration": 3509465000,
+        "load_duration": 1097167,
         "thinking_chars": 0,
-        "total_duration": 4177292167,
+        "total_duration": 4185061583,
         "prompt_eval_count": 413,
-        "prompt_eval_duration": 446752000
+        "prompt_eval_duration": 567792000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -112,7 +112,7 @@
       "cited_documents": [
         "manual-empleado-2025.docx"
       ],
-      "retrieval_ms": 116,
+      "retrieval_ms": 89,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 5,
       "lexical_candidates": 8,
@@ -124,13 +124,14 @@
       "quote_count": 1,
       "literal_quotes_verified": true,
       "answer_terms_present": true,
+      "lead_correct": true,
       "classification": "correct"
     },
     {
       "name": "h_entry_time",
       "expected_abstention": false,
-      "duration_ms": 13402.62,
-      "peak_ollama_rss_mb": 3743.0,
+      "duration_ms": 15697.91,
+      "peak_ollama_rss_mb": 3553.8,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -149,12 +150,12 @@
         "eval_count": 98,
         "done_reason": "stop",
         "content_chars": 318,
-        "eval_duration": 3492995000,
-        "load_duration": 1192791,
+        "eval_duration": 4940488000,
+        "load_duration": 835416,
         "thinking_chars": 0,
-        "total_duration": 5412211958,
+        "total_duration": 5911750500,
         "prompt_eval_count": 448,
-        "prompt_eval_duration": 664345000
+        "prompt_eval_duration": 905129000
       },
       "citation_ids_valid": true,
       "citation_count": 2,
@@ -168,7 +169,7 @@
         "manual-empleado-2025.docx",
         "onboarding-nuevas-incorporaciones.txt"
       ],
-      "retrieval_ms": 162,
+      "retrieval_ms": 151,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 11,
       "lexical_candidates": 10,
@@ -182,13 +183,14 @@
       "quote_count": 2,
       "literal_quotes_verified": true,
       "answer_terms_present": true,
+      "lead_correct": true,
       "classification": "correct"
     },
     {
       "name": "h_birth_leave",
       "expected_abstention": false,
-      "duration_ms": 10614.34,
-      "peak_ollama_rss_mb": 3761.3,
+      "duration_ms": 12900.0,
+      "peak_ollama_rss_mb": 3566.4,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -207,12 +209,12 @@
         "eval_count": 71,
         "done_reason": "stop",
         "content_chars": 246,
-        "eval_duration": 2691769000,
-        "load_duration": 2106833,
+        "eval_duration": 3595839000,
+        "load_duration": 1146417,
         "thinking_chars": 0,
-        "total_duration": 3704518916,
+        "total_duration": 4360590750,
         "prompt_eval_count": 420,
-        "prompt_eval_duration": 534479000
+        "prompt_eval_duration": 703507000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -225,7 +227,7 @@
       "cited_documents": [
         "manual-empleado-2025.docx"
       ],
-      "retrieval_ms": 187,
+      "retrieval_ms": 175,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 5,
       "lexical_candidates": 11,
@@ -237,13 +239,14 @@
       "quote_count": 1,
       "literal_quotes_verified": true,
       "answer_terms_present": true,
+      "lead_correct": true,
       "classification": "correct"
     },
     {
       "name": "h_vacation_expiry",
       "expected_abstention": false,
-      "duration_ms": 14024.29,
-      "peak_ollama_rss_mb": 3782.6,
+      "duration_ms": 14054.74,
+      "peak_ollama_rss_mb": 3626.0,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -262,12 +265,12 @@
         "eval_count": 81,
         "done_reason": "stop",
         "content_chars": 284,
-        "eval_duration": 4046521000,
-        "load_duration": 3346541,
+        "eval_duration": 4202392000,
+        "load_duration": 844875,
         "thinking_chars": 0,
-        "total_duration": 4821606375,
+        "total_duration": 5031194416,
         "prompt_eval_count": 423,
-        "prompt_eval_duration": 669718000
+        "prompt_eval_duration": 710972000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -281,7 +284,7 @@
       "cited_documents": [
         "manual-empleado-2025.docx"
       ],
-      "retrieval_ms": 204,
+      "retrieval_ms": 152,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 4,
       "lexical_candidates": 8,
@@ -298,8 +301,8 @@
     {
       "name": "h_p1_definition",
       "expected_abstention": false,
-      "duration_ms": 20488.15,
-      "peak_ollama_rss_mb": 3751.5,
+      "duration_ms": 20711.6,
+      "peak_ollama_rss_mb": 3598.0,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -318,12 +321,12 @@
         "eval_count": 88,
         "done_reason": "stop",
         "content_chars": 314,
-        "eval_duration": 4559816000,
-        "load_duration": 16606083,
+        "eval_duration": 4569829000,
+        "load_duration": 1389875,
         "thinking_chars": 0,
-        "total_duration": 6520815583,
+        "total_duration": 6337307084,
         "prompt_eval_count": 595,
-        "prompt_eval_duration": 1774335000
+        "prompt_eval_duration": 1699317000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -336,7 +339,7 @@
       "cited_documents": [
         "procedimiento-incidencias-ti.docx"
       ],
-      "retrieval_ms": 198,
+      "retrieval_ms": 195,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 2,
       "lexical_candidates": 4,
@@ -353,8 +356,8 @@
     {
       "name": "h_support_hours",
       "expected_abstention": false,
-      "duration_ms": 21279.69,
-      "peak_ollama_rss_mb": 3803.6,
+      "duration_ms": 19625.62,
+      "peak_ollama_rss_mb": 3632.4,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -373,12 +376,12 @@
         "eval_count": 155,
         "done_reason": "stop",
         "content_chars": 415,
-        "eval_duration": 9076969000,
-        "load_duration": 970291,
+        "eval_duration": 8081998000,
+        "load_duration": 1286458,
         "thinking_chars": 0,
-        "total_duration": 10087741583,
+        "total_duration": 9120231000,
         "prompt_eval_count": 462,
-        "prompt_eval_duration": 938748000
+        "prompt_eval_duration": 889907000
       },
       "citation_ids_valid": true,
       "citation_count": 2,
@@ -392,7 +395,7 @@
         "procedimiento-incidencias-ti.docx",
         "faq-clientes-devoluciones.md"
       ],
-      "retrieval_ms": 177,
+      "retrieval_ms": 141,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 8,
       "lexical_candidates": 4,
@@ -411,8 +414,8 @@
     {
       "name": "h_night_guard",
       "expected_abstention": false,
-      "duration_ms": 28408.91,
-      "peak_ollama_rss_mb": 3750.7,
+      "duration_ms": 18195.4,
+      "peak_ollama_rss_mb": 3691.2,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -431,12 +434,12 @@
         "eval_count": 95,
         "done_reason": "stop",
         "content_chars": 297,
-        "eval_duration": 8202111999,
-        "load_duration": 782875,
+        "eval_duration": 4986799000,
+        "load_duration": 620542,
         "thinking_chars": 0,
-        "total_duration": 9794633000,
+        "total_duration": 5968811417,
         "prompt_eval_count": 467,
-        "prompt_eval_duration": 1466908000
+        "prompt_eval_duration": 950097000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -447,7 +450,7 @@
       "cited_documents": [
         "procedimiento-incidencias-ti.docx"
       ],
-      "retrieval_ms": 205,
+      "retrieval_ms": 168,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 3,
       "lexical_candidates": 4,
@@ -459,13 +462,14 @@
       "quote_count": 1,
       "literal_quotes_verified": true,
       "answer_terms_present": true,
+      "lead_correct": true,
       "classification": "correct"
     },
     {
       "name": "h_lost_laptop",
       "expected_abstention": false,
-      "duration_ms": 27872.15,
-      "peak_ollama_rss_mb": 3757.3,
+      "duration_ms": 16231.56,
+      "peak_ollama_rss_mb": 3612.5,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -484,12 +488,12 @@
         "eval_count": 88,
         "done_reason": "stop",
         "content_chars": 300,
-        "eval_duration": 7608050000,
-        "load_duration": 902875,
+        "eval_duration": 4701149000,
+        "load_duration": 884708,
         "thinking_chars": 0,
-        "total_duration": 9674189417,
+        "total_duration": 5907678958,
         "prompt_eval_count": 483,
-        "prompt_eval_duration": 2000685000
+        "prompt_eval_duration": 1111615000
       },
       "citation_ids_valid": true,
       "citation_count": 2,
@@ -502,7 +506,7 @@
       "cited_documents": [
         "politica-seguridad-informacion.md"
       ],
-      "retrieval_ms": 197,
+      "retrieval_ms": 161,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 12,
       "lexical_candidates": 9,
@@ -514,13 +518,14 @@
       "quote_count": 2,
       "literal_quotes_verified": true,
       "answer_terms_present": true,
+      "lead_correct": true,
       "classification": "correct"
     },
     {
       "name": "h_mfa",
       "expected_abstention": false,
-      "duration_ms": 16554.47,
-      "peak_ollama_rss_mb": 3758.6,
+      "duration_ms": 11342.1,
+      "peak_ollama_rss_mb": 3603.9,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -539,12 +544,12 @@
         "eval_count": 82,
         "done_reason": "stop",
         "content_chars": 287,
-        "eval_duration": 6574082000,
-        "load_duration": 1361792,
+        "eval_duration": 4541180000,
+        "load_duration": 18064333,
         "thinking_chars": 0,
-        "total_duration": 7464530417,
+        "total_duration": 5250437375,
         "prompt_eval_count": 402,
-        "prompt_eval_duration": 838609000
+        "prompt_eval_duration": 616131000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -555,7 +560,7 @@
       "cited_documents": [
         "politica-seguridad-informacion.md"
       ],
-      "retrieval_ms": 205,
+      "retrieval_ms": 182,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 2,
       "lexical_candidates": 2,
@@ -572,8 +577,8 @@
     {
       "name": "h_full_per_diem_abroad",
       "expected_abstention": false,
-      "duration_ms": 13307.0,
-      "peak_ollama_rss_mb": 3803.3,
+      "duration_ms": 10881.4,
+      "peak_ollama_rss_mb": 3495.4,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -592,12 +597,12 @@
         "eval_count": 59,
         "done_reason": "stop",
         "content_chars": 182,
-        "eval_duration": 3942549000,
-        "load_duration": 902708,
+        "eval_duration": 3467430000,
+        "load_duration": 20399000,
         "thinking_chars": 0,
-        "total_duration": 5011673583,
+        "total_duration": 3987222667,
         "prompt_eval_count": 380,
-        "prompt_eval_duration": 394254000
+        "prompt_eval_duration": 407517000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -609,7 +614,7 @@
       "cited_documents": [
         "politica-gastos-viajes.pdf"
       ],
-      "retrieval_ms": 202,
+      "retrieval_ms": 458,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 2,
       "lexical_candidates": 3,
@@ -621,13 +626,14 @@
       "quote_count": 1,
       "literal_quotes_verified": true,
       "answer_terms_present": true,
+      "lead_correct": true,
       "classification": "correct"
     },
     {
       "name": "h_approve_2000",
       "expected_abstention": false,
-      "duration_ms": 17678.31,
-      "peak_ollama_rss_mb": 3771.7,
+      "duration_ms": 14608.37,
+      "peak_ollama_rss_mb": 3366.6,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -646,12 +652,12 @@
         "eval_count": 65,
         "done_reason": "stop",
         "content_chars": 204,
-        "eval_duration": 5486986000,
-        "load_duration": 28556417,
+        "eval_duration": 3819198000,
+        "load_duration": 26476625,
         "thinking_chars": 0,
-        "total_duration": 6806888625,
+        "total_duration": 5699971875,
         "prompt_eval_count": 388,
-        "prompt_eval_duration": 869737000
+        "prompt_eval_duration": 529110000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -664,7 +670,7 @@
       "cited_documents": [
         "politica-gastos-viajes.pdf"
       ],
-      "retrieval_ms": 158,
+      "retrieval_ms": 220,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 7,
       "lexical_candidates": 11,
@@ -676,13 +682,14 @@
       "quote_count": 1,
       "literal_quotes_verified": true,
       "answer_terms_present": true,
+      "lead_correct": true,
       "classification": "correct"
     },
     {
       "name": "h_business_class",
       "expected_abstention": false,
-      "duration_ms": 20629.2,
-      "peak_ollama_rss_mb": 3760.4,
+      "duration_ms": 17394.45,
+      "peak_ollama_rss_mb": 3562.5,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -701,12 +708,12 @@
         "eval_count": 108,
         "done_reason": "stop",
         "content_chars": 399,
-        "eval_duration": 7425155000,
-        "load_duration": 17006333,
+        "eval_duration": 5990384000,
+        "load_duration": 17616709,
         "thinking_chars": 0,
-        "total_duration": 8332885208,
+        "total_duration": 6665421542,
         "prompt_eval_count": 404,
-        "prompt_eval_duration": 685428000
+        "prompt_eval_duration": 600446000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -720,7 +727,7 @@
       "cited_documents": [
         "politica-gastos-viajes.pdf"
       ],
-      "retrieval_ms": 231,
+      "retrieval_ms": 237,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 4,
       "lexical_candidates": 8,
@@ -737,8 +744,8 @@
     {
       "name": "h_contract_term",
       "expected_abstention": false,
-      "duration_ms": 21375.43,
-      "peak_ollama_rss_mb": 3711.4,
+      "duration_ms": 16693.08,
+      "peak_ollama_rss_mb": 3519.7,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -757,12 +764,12 @@
         "eval_count": 138,
         "done_reason": "stop",
         "content_chars": 441,
-        "eval_duration": 9627449000,
-        "load_duration": 19348083,
+        "eval_duration": 7497170000,
+        "load_duration": 6971167,
         "thinking_chars": 0,
-        "total_duration": 10694303458,
+        "total_duration": 8352317375,
         "prompt_eval_count": 417,
-        "prompt_eval_duration": 903323000
+        "prompt_eval_duration": 742483000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -774,7 +781,7 @@
       "cited_documents": [
         "contrato-transportes-rapido-norte.pdf"
       ],
-      "retrieval_ms": 201,
+      "retrieval_ms": 183,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 3,
       "lexical_candidates": 1,
@@ -791,8 +798,8 @@
     {
       "name": "h_contract_notice",
       "expected_abstention": false,
-      "duration_ms": 22086.99,
-      "peak_ollama_rss_mb": 3597.9,
+      "duration_ms": 16138.19,
+      "peak_ollama_rss_mb": 3546.3,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -811,12 +818,12 @@
         "eval_count": 81,
         "done_reason": "stop",
         "content_chars": 299,
-        "eval_duration": 6058017000,
-        "load_duration": 25022417,
+        "eval_duration": 5184784000,
+        "load_duration": 3251583,
         "thinking_chars": 0,
-        "total_duration": 9087411584,
+        "total_duration": 5935192000,
         "prompt_eval_count": 395,
-        "prompt_eval_duration": 490459000
+        "prompt_eval_duration": 613778000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -831,7 +838,7 @@
       "cited_documents": [
         "contrato-transportes-rapido-norte.pdf"
       ],
-      "retrieval_ms": 285,
+      "retrieval_ms": 197,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 3,
       "lexical_candidates": 6,
@@ -843,13 +850,14 @@
       "quote_count": 1,
       "literal_quotes_verified": true,
       "answer_terms_present": true,
+      "lead_correct": true,
       "classification": "correct"
     },
     {
       "name": "h_insurance",
       "expected_abstention": false,
-      "duration_ms": 18162.03,
-      "peak_ollama_rss_mb": 3747.6,
+      "duration_ms": 15772.95,
+      "peak_ollama_rss_mb": 3528.7,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -868,12 +876,12 @@
         "eval_count": 79,
         "done_reason": "stop",
         "content_chars": 281,
-        "eval_duration": 5023952000,
-        "load_duration": 19551375,
+        "eval_duration": 4884883000,
+        "load_duration": 17387333,
         "thinking_chars": 0,
-        "total_duration": 7778682708,
+        "total_duration": 5626314542,
         "prompt_eval_count": 394,
-        "prompt_eval_duration": 459824000
+        "prompt_eval_duration": 643871000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -887,7 +895,7 @@
       "cited_documents": [
         "contrato-transportes-rapido-norte.pdf"
       ],
-      "retrieval_ms": 255,
+      "retrieval_ms": 307,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 2,
       "lexical_candidates": 5,
@@ -899,13 +907,14 @@
       "quote_count": 1,
       "literal_quotes_verified": true,
       "answer_terms_present": true,
+      "lead_correct": true,
       "classification": "correct"
     },
     {
       "name": "h_refund_time",
       "expected_abstention": false,
-      "duration_ms": 23430.55,
-      "peak_ollama_rss_mb": 3775.0,
+      "duration_ms": 19406.81,
+      "peak_ollama_rss_mb": 3577.7,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -924,12 +933,12 @@
         "eval_count": 94,
         "done_reason": "stop",
         "content_chars": 302,
-        "eval_duration": 6114549000,
-        "load_duration": 21681958,
+        "eval_duration": 5220674000,
+        "load_duration": 18172375,
         "thinking_chars": 0,
-        "total_duration": 7467360125,
+        "total_duration": 6306417208,
         "prompt_eval_count": 454,
-        "prompt_eval_duration": 1119423000
+        "prompt_eval_duration": 938353000
       },
       "citation_ids_valid": true,
       "citation_count": 2,
@@ -943,7 +952,7 @@
         "faq-clientes-devoluciones.md",
         "politica-gastos-viajes.pdf"
       ],
-      "retrieval_ms": 423,
+      "retrieval_ms": 182,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 3,
       "lexical_candidates": 11,
@@ -957,13 +966,14 @@
       "quote_count": 2,
       "literal_quotes_verified": true,
       "answer_terms_present": true,
+      "lead_correct": true,
       "classification": "correct"
     },
     {
       "name": "h_warranty",
       "expected_abstention": false,
-      "duration_ms": 13719.17,
-      "peak_ollama_rss_mb": 3710.8,
+      "duration_ms": 12082.66,
+      "peak_ollama_rss_mb": 3522.5,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -982,12 +992,12 @@
         "eval_count": 73,
         "done_reason": "stop",
         "content_chars": 287,
-        "eval_duration": 4650848000,
-        "load_duration": 15347292,
+        "eval_duration": 3972904000,
+        "load_duration": 17755916,
         "thinking_chars": 0,
-        "total_duration": 5380468792,
+        "total_duration": 4649832083,
         "prompt_eval_count": 392,
-        "prompt_eval_duration": 671568000
+        "prompt_eval_duration": 591947000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -998,7 +1008,7 @@
       "cited_documents": [
         "faq-clientes-devoluciones.md"
       ],
-      "retrieval_ms": 192,
+      "retrieval_ms": 207,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 3,
       "lexical_candidates": 2,
@@ -1015,8 +1025,8 @@
     {
       "name": "h_prl_training",
       "expected_abstention": false,
-      "duration_ms": 16972.17,
-      "peak_ollama_rss_mb": 3757.4,
+      "duration_ms": 12744.54,
+      "peak_ollama_rss_mb": 3583.0,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -1035,12 +1045,12 @@
         "eval_count": 98,
         "done_reason": "stop",
         "content_chars": 354,
-        "eval_duration": 8034203000,
-        "load_duration": 998792,
+        "eval_duration": 5097441000,
+        "load_duration": 819834,
         "thinking_chars": 0,
-        "total_duration": 8849562917,
+        "total_duration": 5720034709,
         "prompt_eval_count": 404,
-        "prompt_eval_duration": 701741000
+        "prompt_eval_duration": 573319000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -1052,7 +1062,7 @@
       "cited_documents": [
         "onboarding-nuevas-incorporaciones.txt"
       ],
-      "retrieval_ms": 209,
+      "retrieval_ms": 183,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 2,
       "lexical_candidates": 2,
@@ -1069,8 +1079,8 @@
     {
       "name": "h_office_day",
       "expected_abstention": false,
-      "duration_ms": 15797.1,
-      "peak_ollama_rss_mb": 3712.2,
+      "duration_ms": 10479.32,
+      "peak_ollama_rss_mb": 3549.4,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -1089,12 +1099,12 @@
         "eval_count": 65,
         "done_reason": "stop",
         "content_chars": 258,
-        "eval_duration": 5198398000,
-        "load_duration": 18592875,
+        "eval_duration": 3416258000,
+        "load_duration": 868500,
         "thinking_chars": 0,
-        "total_duration": 6123362500,
+        "total_duration": 4069394125,
         "prompt_eval_count": 401,
-        "prompt_eval_duration": 837159000
+        "prompt_eval_duration": 597265000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -1108,7 +1118,7 @@
       "cited_documents": [
         "politica-teletrabajo-2025.md"
       ],
-      "retrieval_ms": 217,
+      "retrieval_ms": 172,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 13,
       "lexical_candidates": 11,
@@ -1120,13 +1130,14 @@
       "quote_count": 1,
       "literal_quotes_verified": true,
       "answer_terms_present": true,
+      "lead_correct": true,
       "classification": "correct"
     },
     {
       "name": "h_neg_exec_vacation",
       "expected_abstention": true,
-      "duration_ms": 230.59,
-      "peak_ollama_rss_mb": 3535.8,
+      "duration_ms": 167.43,
+      "peak_ollama_rss_mb": 3341.6,
       "peak_loaded_model_mb": 3688.1,
       "abstained": true,
       "abstention_reason": "missing_question_party",
@@ -1145,7 +1156,7 @@
         "contrato-transportes-rapido-norte.pdf"
       ],
       "cited_documents": [],
-      "retrieval_ms": 200,
+      "retrieval_ms": 150,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 7,
       "lexical_candidates": 12,
@@ -1161,8 +1172,8 @@
     {
       "name": "h_neg_maternity_weeks",
       "expected_abstention": true,
-      "duration_ms": 27469.09,
-      "peak_ollama_rss_mb": 3709.8,
+      "duration_ms": 19303.52,
+      "peak_ollama_rss_mb": 3609.5,
       "peak_loaded_model_mb": 3688.1,
       "abstained": true,
       "abstention_reason": "insufficient_evidence",
@@ -1181,12 +1192,12 @@
         "eval_count": 74,
         "done_reason": "stop",
         "content_chars": 292,
-        "eval_duration": 5588814000,
-        "load_duration": 17292459,
+        "eval_duration": 4701825000,
+        "load_duration": 28354667,
         "thinking_chars": 0,
-        "total_duration": 8479346125,
+        "total_duration": 6870605000,
         "prompt_eval_count": 611,
-        "prompt_eval_duration": 2790563000
+        "prompt_eval_duration": 2033618000
       },
       "citation_ids_valid": true,
       "citation_count": 0,
@@ -1197,7 +1208,7 @@
         "politica-teletrabajo-2023.pdf"
       ],
       "cited_documents": [],
-      "retrieval_ms": 166,
+      "retrieval_ms": 113,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 5,
       "lexical_candidates": 4,
@@ -1213,8 +1224,8 @@
     {
       "name": "h_neg_extra_kg",
       "expected_abstention": true,
-      "duration_ms": 16671.54,
-      "peak_ollama_rss_mb": 3780.3,
+      "duration_ms": 15453.38,
+      "peak_ollama_rss_mb": 3504.5,
       "peak_loaded_model_mb": 3688.1,
       "abstained": true,
       "abstention_reason": "insufficient_evidence",
@@ -1233,12 +1244,12 @@
         "eval_count": 73,
         "done_reason": "stop",
         "content_chars": 233,
-        "eval_duration": 5370613000,
-        "load_duration": 1315667,
+        "eval_duration": 4911525000,
+        "load_duration": 22290958,
         "thinking_chars": 0,
-        "total_duration": 6173285042,
+        "total_duration": 5833797333,
         "prompt_eval_count": 396,
-        "prompt_eval_duration": 738121000
+        "prompt_eval_duration": 698310000
       },
       "citation_ids_valid": true,
       "citation_count": 0,
@@ -1249,7 +1260,7 @@
         "manual-empleado-2025.docx"
       ],
       "cited_documents": [],
-      "retrieval_ms": 184,
+      "retrieval_ms": 247,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 2,
       "lexical_candidates": 3,
@@ -1265,8 +1276,8 @@
     {
       "name": "h_neg_employee_discount",
       "expected_abstention": true,
-      "duration_ms": 26434.67,
-      "peak_ollama_rss_mb": 3703.1,
+      "duration_ms": 23828.49,
+      "peak_ollama_rss_mb": 3535.6,
       "peak_loaded_model_mb": 3688.1,
       "abstained": true,
       "abstention_reason": "insufficient_evidence",
@@ -1285,12 +1296,12 @@
         "eval_count": 67,
         "done_reason": "stop",
         "content_chars": 258,
-        "eval_duration": 4897294000,
-        "load_duration": 785250,
+        "eval_duration": 4382640000,
+        "load_duration": 52129333,
         "thinking_chars": 0,
-        "total_duration": 7501985000,
+        "total_duration": 6602704250,
         "prompt_eval_count": 581,
-        "prompt_eval_duration": 2534222000
+        "prompt_eval_duration": 2057601999
       },
       "citation_ids_valid": true,
       "citation_count": 0,
@@ -1300,7 +1311,7 @@
         "manual-empleado-2025.docx"
       ],
       "cited_documents": [],
-      "retrieval_ms": 158,
+      "retrieval_ms": 217,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 8,
       "lexical_candidates": 2,
@@ -1316,8 +1327,8 @@
     {
       "name": "h_neg_guest_wifi",
       "expected_abstention": true,
-      "duration_ms": 15099.84,
-      "peak_ollama_rss_mb": 3769.6,
+      "duration_ms": 14646.36,
+      "peak_ollama_rss_mb": 3501.5,
       "peak_loaded_model_mb": 3688.1,
       "abstained": true,
       "abstention_reason": "insufficient_evidence",
@@ -1336,12 +1347,12 @@
         "eval_count": 50,
         "done_reason": "stop",
         "content_chars": 213,
-        "eval_duration": 3605897000,
-        "load_duration": 5247667,
+        "eval_duration": 3100368000,
+        "load_duration": 28247000,
         "thinking_chars": 0,
-        "total_duration": 5002726083,
+        "total_duration": 4393725625,
         "prompt_eval_count": 455,
-        "prompt_eval_duration": 1345368000
+        "prompt_eval_duration": 1167944000
       },
       "citation_ids_valid": true,
       "citation_count": 0,
@@ -1350,7 +1361,7 @@
         "procedimiento-incidencias-ti.docx"
       ],
       "cited_documents": [],
-      "retrieval_ms": 214,
+      "retrieval_ms": 225,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 3,
       "lexical_candidates": 2,
@@ -1366,8 +1377,8 @@
     {
       "name": "h_neg_teleworking_2024",
       "expected_abstention": true,
-      "duration_ms": 192.01,
-      "peak_ollama_rss_mb": 3709.3,
+      "duration_ms": 221.72,
+      "peak_ollama_rss_mb": 3280.4,
       "peak_loaded_model_mb": 3688.1,
       "abstained": true,
       "abstention_reason": "missing_question_scope",
@@ -1385,7 +1396,7 @@
         "manual-empleado-2025.docx"
       ],
       "cited_documents": [],
-      "retrieval_ms": 179,
+      "retrieval_ms": 205,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 8,
       "lexical_candidates": 13,
@@ -1428,14 +1439,14 @@
     "all_quotes_literal": true,
     "answerable_cases_with_expected_terms": 19,
     "chat_latency_ms": {
-      "p50": 16972.2,
-      "p95": 27872.2,
-      "max": 28408.9,
-      "total_s": 434.4
+      "p50": 15453.4,
+      "p95": 20711.6,
+      "max": 23828.5,
+      "total_s": 361.2
     },
-    "peak_ollama_rss_mb": 3803.6,
+    "peak_ollama_rss_mb": 3691.2,
     "peak_loaded_model_mb": 3688.1,
-    "mean_retrieval_ms_including_embedding": 205
+    "mean_retrieval_ms_including_embedding": 196.68
   },
   "journey_checks": {
     "registration_and_login": true,

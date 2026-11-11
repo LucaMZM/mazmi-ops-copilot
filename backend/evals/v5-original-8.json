@@ -1,6 +1,6 @@
 {
   "mode": "live-ollama-http-pipeline-real-postgresql",
-  "created_at_utc": "2026-11-11T18:02:56.555084+00:00",
+  "created_at_utc": "2026-11-11T18:49:49.400920+00:00",
   "generation_model": "qwen3:4b",
   "embedding_model": "embeddinggemma",
   "embedding_dimensions": 768,
@@ -12,33 +12,33 @@
       "fixture": "compras-ficticias.txt",
       "http_status": 200,
       "ready": true,
-      "duration_ms": 250.59
+      "duration_ms": 191.15
     },
     {
       "fixture": "incidencias-ficticias.txt",
       "http_status": 200,
       "ready": true,
-      "duration_ms": 131.13
+      "duration_ms": 122.69
     },
     {
       "fixture": "inventario-ficticio.txt",
       "http_status": 200,
       "ready": true,
-      "duration_ms": 114.72
+      "duration_ms": 117.93
     },
     {
       "fixture": "aprobaciones-ficticias.txt",
       "http_status": 200,
       "ready": true,
-      "duration_ms": 128.61
+      "duration_ms": 105.23
     }
   ],
   "cases": [
     {
       "name": "known_purchase_limit",
       "expected_abstention": false,
-      "duration_ms": 17929.72,
-      "peak_ollama_rss_mb": 3722.5,
+      "duration_ms": 13620.5,
+      "peak_ollama_rss_mb": 3493.8,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -57,12 +57,12 @@
         "eval_count": 91,
         "done_reason": "stop",
         "content_chars": 337,
-        "eval_duration": 6674965000,
-        "load_duration": 885625,
+        "eval_duration": 4916718000,
+        "load_duration": 979084,
         "thinking_chars": 0,
-        "total_duration": 7791620708,
+        "total_duration": 5919377792,
         "prompt_eval_count": 435,
-        "prompt_eval_duration": 1059222000
+        "prompt_eval_duration": 705663000
       },
       "citation_ids_valid": true,
       "citation_count": 2,
@@ -75,7 +75,7 @@
         "compras-ficticias.txt",
         "aprobaciones-ficticias.txt"
       ],
-      "retrieval_ms": 126,
+      "retrieval_ms": 100,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 3,
       "lexical_candidates": 3,
@@ -93,8 +93,8 @@
     {
       "name": "exact_procedure_identifier",
       "expected_abstention": false,
-      "duration_ms": 11916.89,
-      "peak_ollama_rss_mb": 3751.7,
+      "duration_ms": 10079.05,
+      "peak_ollama_rss_mb": 3476.4,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -113,12 +113,12 @@
         "eval_count": 78,
         "done_reason": "stop",
         "content_chars": 275,
-        "eval_duration": 5818604000,
-        "load_duration": 619000,
+        "eval_duration": 4481794000,
+        "load_duration": 1610709,
         "thinking_chars": 0,
-        "total_duration": 6380670667,
+        "total_duration": 4959090625,
         "prompt_eval_count": 381,
-        "prompt_eval_duration": 539404000
+        "prompt_eval_duration": 430178000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -129,7 +129,7 @@
       "cited_documents": [
         "incidencias-ficticias.txt"
       ],
-      "retrieval_ms": 108,
+      "retrieval_ms": 149,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 1,
       "lexical_candidates": 2,
@@ -145,8 +145,8 @@
     {
       "name": "workspace_inventory_scope",
       "expected_abstention": false,
-      "duration_ms": 12896.54,
-      "peak_ollama_rss_mb": 3760.5,
+      "duration_ms": 10333.38,
+      "peak_ollama_rss_mb": 3585.2,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -166,12 +166,12 @@
         "eval_count": 77,
         "done_reason": "stop",
         "content_chars": 228,
-        "eval_duration": 5736624000,
-        "load_duration": 960125,
+        "eval_duration": 5107834000,
+        "load_duration": 18008875,
         "thinking_chars": 0,
-        "total_duration": 6616649583,
+        "total_duration": 5816124083,
         "prompt_eval_count": 384,
-        "prompt_eval_duration": 839801000
+        "prompt_eval_duration": 627413000
       },
       "citation_ids_valid": true,
       "citation_count": 1,
@@ -181,7 +181,7 @@
       "cited_documents": [
         "inventario-ficticio.txt"
       ],
-      "retrieval_ms": 163,
+      "retrieval_ms": 141,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 1,
       "lexical_candidates": 1,
@@ -197,8 +197,8 @@
     {
       "name": "multipart_purchase_approval_audit",
       "expected_abstention": false,
-      "duration_ms": 22072.25,
-      "peak_ollama_rss_mb": 3748.7,
+      "duration_ms": 19106.25,
+      "peak_ollama_rss_mb": 3503.7,
       "peak_loaded_model_mb": 3688.1,
       "abstained": false,
       "abstention_reason": null,
@@ -217,12 +217,12 @@
         "eval_count": 140,
         "done_reason": "stop",
         "content_chars": 470,
-        "eval_duration": 10478162000,
-        "load_duration": 952834,
+        "eval_duration": 8165584000,
+        "load_duration": 16997208,
         "thinking_chars": 0,
-        "total_duration": 11620372167,
+        "total_duration": 9144258833,
         "prompt_eval_count": 437,
-        "prompt_eval_duration": 1080125000
+        "prompt_eval_duration": 799375000
       },
       "citation_ids_valid": true,
       "citation_count": 2,
@@ -236,7 +236,7 @@
         "aprobaciones-ficticias.txt",
         "compras-ficticias.txt"
       ],
-      "retrieval_ms": 141,
+      "retrieval_ms": 236,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 2,
       "lexical_candidates": 4,
@@ -252,8 +252,8 @@
     {
       "name": "no_salary_policy",
       "expected_abstention": true,
-      "duration_ms": 161.84,
-      "peak_ollama_rss_mb": 3487.5,
+      "duration_ms": 197.22,
+      "peak_ollama_rss_mb": 3282.9,
       "peak_loaded_model_mb": 3688.1,
       "abstained": true,
       "abstention_reason": "missing_fact_relation",
@@ -269,7 +269,7 @@
         "compras-ficticias.txt"
       ],
       "cited_documents": [],
-      "retrieval_ms": 146,
+      "retrieval_ms": 173,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 1,
       "lexical_candidates": 1,
@@ -285,8 +285,8 @@
     {
       "name": "missing_inventory_location",
       "expected_abstention": true,
-      "duration_ms": 127.74,
-      "peak_ollama_rss_mb": 3479.1,
+      "duration_ms": 108.75,
+      "peak_ollama_rss_mb": 3306.8,
       "peak_loaded_model_mb": 3688.1,
       "abstained": true,
       "abstention_reason": "missing_question_scope",
@@ -303,7 +303,7 @@
         "incidencias-ficticias.txt"
       ],
       "cited_documents": [],
-      "retrieval_ms": 116,
+      "retrieval_ms": 98,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 2,
       "lexical_candidates": 1,
@@ -319,8 +319,8 @@
     {
       "name": "related_but_missing_delivery_sla",
       "expected_abstention": true,
-      "duration_ms": 17596.56,
-      "peak_ollama_rss_mb": 3734.1,
+      "duration_ms": 12909.16,
+      "peak_ollama_rss_mb": 3488.5,
       "peak_loaded_model_mb": 3688.1,
       "abstained": true,
       "abstention_reason": "insufficient_evidence",
@@ -340,12 +340,12 @@
         "eval_count": 81,
         "done_reason": "stop",
         "content_chars": 294,
-        "eval_duration": 5865625000,
-        "load_duration": 973625,
+        "eval_duration": 4436043000,
+        "load_duration": 16716542,
         "thinking_chars": 0,
-        "total_duration": 6996570875,
+        "total_duration": 5321841792,
         "prompt_eval_count": 427,
-        "prompt_eval_duration": 1064665000
+        "prompt_eval_duration": 801168000
       },
       "citation_ids_valid": true,
       "citation_count": 0,
@@ -354,7 +354,7 @@
         "aprobaciones-ficticias.txt"
       ],
       "cited_documents": [],
-      "retrieval_ms": 109,
+      "retrieval_ms": 117,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 2,
       "lexical_candidates": 2,
@@ -370,8 +370,8 @@
     {
       "name": "missing_person_identity",
       "expected_abstention": true,
-      "duration_ms": 18773.84,
-      "peak_ollama_rss_mb": 3725.8,
+      "duration_ms": 14019.86,
+      "peak_ollama_rss_mb": 3544.0,
       "peak_loaded_model_mb": 3688.1,
       "abstained": true,
       "abstention_reason": "insufficient_evidence",
@@ -391,12 +391,12 @@
         "eval_count": 83,
         "done_reason": "stop",
         "content_chars": 323,
-        "eval_duration": 6689651000,
-        "load_duration": 941375,
+        "eval_duration": 4607090000,
+        "load_duration": 4536334,
         "thinking_chars": 0,
-        "total_duration": 8032794708,
+        "total_duration": 5486730875,
         "prompt_eval_count": 422,
-        "prompt_eval_duration": 1276760000
+        "prompt_eval_duration": 814104000
       },
       "citation_ids_valid": true,
       "citation_count": 0,
@@ -406,7 +406,7 @@
         "inventario-ficticio.txt"
       ],
       "cited_documents": [],
-      "retrieval_ms": 154,
+      "retrieval_ms": 220,
       "retrieval_strategy": "hybrid_rrf_v2",
       "vector_candidates": 2,
       "lexical_candidates": 3,
@@ -449,14 +449,14 @@
     "all_quotes_literal": true,
     "answerable_cases_with_expected_terms": 4,
     "chat_latency_ms": {
-      "p50": 15246.6,
-      "p95": 22072.2,
-      "max": 22072.2,
-      "total_s": 101.5
+      "p50": 11621.3,
+      "p95": 19106.2,
+      "max": 19106.2,
+      "total_s": 80.4
     },
-    "peak_ollama_rss_mb": 3760.5,
+    "peak_ollama_rss_mb": 3585.2,
     "peak_loaded_model_mb": 3688.1,
-    "mean_retrieval_ms_including_embedding": 132.875
+    "mean_retrieval_ms_including_embedding": 154.25
   },
   "journey_checks": {
     "registration_and_login": true,

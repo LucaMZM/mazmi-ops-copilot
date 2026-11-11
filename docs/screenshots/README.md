@@ -1,5 +1,11 @@
 # Procedencia de las capturas
 
-Capturas reales del build de producción de Next.js (127.0.0.1:3000) con FastAPI, PostgreSQL 17 con pgvector, Qwen3 4B y EmbeddingGemma ejecutándose en Ollama local. Cuenta y workspace creados desde la pantalla de registro; los tres documentos (teletrabajo, formación y residuos) son textos ficticios subidos por la vía normal de la aplicación para poder fotografiarla. Sin modo demo, sin claves y sin retoque ni composición: PNG escrito directamente por el navegador (escritorio 1440 × 900, móvil 390 × 844).
+Capturas reales tomadas el 11 de noviembre de 2026 con Playwright (Chromium) sobre el build de producción de Next.js (127.0.0.1:3000), con FastAPI, PostgreSQL 17 con pgvector, y Qwen3 4B y EmbeddingGemma en Ollama local.
 
-Son pasos sucesivos de un mismo recorrido. Las respuestas se generaron en el momento con el modelo local; los tiempos medidos están en [VALIDATION.md](../../VALIDATION.md).
+- **Cuenta:** creada desde la pantalla de registro.
+- **Documentos:** los diez del corpus ficticio «Aurelia Logística», cargados en su propio workspace con `python -m app.presentation_corpus`.
+- **Respuestas:** generadas en el momento por el modelo local.
+
+Sin modo demo, sin claves y sin retoque ni composición: PNG escrito directamente por el navegador. Escritorio a 1440 × 900 en tema claro y oscuro; móvil a 390 × 844, sin desbordamiento horizontal medido.
+
+Son pasos sucesivos de un mismo recorrido: la propuesta de `approvals.png` se confirmó después, como se ve en `copilot.png`.

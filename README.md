@@ -88,12 +88,13 @@ Las pruebas normales no llaman a ningún modelo ni descargan nada. Las evaluacio
 
 Con Ollama real (Qwen3 4B + EmbeddingGemma) en un Mac de 8 GB y bases nuevas:
 
-- **Corpus realista** (DOCX y PDF con tablas, dos versiones de una política, contrato): **25/25 en el conjunto reservado** y 34/35 en el de desarrollo, con todas las citas literales. Antes de las correcciones, ese mismo conjunto de desarrollo rechazaba 19 de 27 preguntas con respuesta.
-- Conjuntos pequeños: 8/8, 13/13 y 11/11. Corpus adversarial de pasajes fijos: 25/27.
-- 13/13 recorridos de seguridad en todas las ejecuciones. Propuesta de ticket en ≈4 s (antes 90–120 s). Respuesta documental: mediana de 9 a 18 s según el tamaño de los pasajes; ≈3,8 GB de memoria en Ollama.
-- **Fallos abiertos:** un conflicto parafraseado entre pasajes y un dato real atribuido a la parte equivocada (tarifa del transportista dada como coste para el cliente).
+- **Corpus realista** (DOCX y PDF con tablas, dos versiones de una política, contrato): **15/15 en un conjunto reservado nunca visto**, 25/25 en el primer reservado y 35/35 en desarrollo. Todas las citas son literales y los 36 titulares mostrados son correctos.
+- **Una cita literal no basta:** si la pregunta nombra a una parte (un cliente) y la evidencia habla de otra (lo que el transportista cobra a la empresa), se abstiene. Dos documentos con cantidades distintas para un mismo dato, aunque una esté escrita con letras, se tratan como conflicto.
+- **Seguridad:** 13/13 recorridos en todas las ejecuciones.
+- **Tiempos:** propuesta de ticket en unos 5 s; respuesta documental con mediana de 11 a 15 s; unos 3,7 GB de memoria en Ollama.
+- **Fallos abiertos:** 2 de 20 respuestas sin soporte en el conjunto semántico reservado, por conflictos parafraseados sin cantidades. Es un límite medido de Qwen3 4B; no hay tag `v1.0.0`.
 
-Tablas, causas y criterios: [VALIDATION.md](VALIDATION.md).
+Tablas, intentos descartados y criterios: [VALIDATION.md](VALIDATION.md). Demostración en cinco minutos: [docs/PRESENTACION.md](docs/PRESENTACION.md).
 
 ## Límites conocidos
 
