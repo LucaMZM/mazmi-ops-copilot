@@ -627,7 +627,22 @@ def documentary_answer(client, question, sources, history=None, emit=None):
                         f"{_origin(sources[p['id'] - 1])}:\n«{quote_text(shown)}» [{p['citation']}]"
                     )
                 text = "\n\n".join(blocks)
-                span = literal_lead(lead, shown_texts) if lead and settings.answer_lead else None
+                # The headline is only as reliable as what it was read from. From a whole table
+                # or several sentences a small model can pick the wrong row ("Dirección
+                # general" for 800 euros while the row says Finanzas), so a lead is shown only
+                # when every verified quote is a single sentence, list item or table row.
+                single = all(
+                    len(covered_units(q, items[pid - 1]["text"])) <= 1
+                    for pid, qs in (quotes or {}).items()
+                    for q in qs
+                )
+                span = (
+                    literal_lead(lead, shown_texts)
+                    if lead and settings.answer_lead and single
+                    else None
+                )
+                if lead and settings.answer_lead and not single:
+                    meta["answer_lead_withheld"] = "multi_unit_quote"
                 if span:
                     meta["answer_lead"] = span
                     text = f"Respuesta: {span}\n\n{text}"

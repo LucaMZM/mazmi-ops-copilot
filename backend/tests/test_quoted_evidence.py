@@ -642,3 +642,22 @@ def test_a_quote_with_markdown_never_reaches_the_answer_as_markdown():
     from app.evaluate_local import literal_quotes
 
     assert literal_quotes(text, {1: table}) == (1, True)
+
+
+def test_no_headline_is_read_from_a_whole_table():
+    table = (
+        "Importe del gasto | Quién aprueba\nHasta 300 euros | La persona responsable\n"
+        "Más de 300 y hasta 1.500 euros | Finanzas\nMás de 1.500 euros | Dirección general"
+    )
+    sources = [{"content": table, "filename": "gastos.pdf"}]
+    wrong_row = verdict("Dirección general")  # a small model may read the wrong row
+    client, _ = scripted(selection(table), wrong_row)
+    text, _, meta = documentary_answer(client, "¿Quién aprueba un gasto de 800 euros?", sources)
+    assert meta["abstention_reason"] is None and "answer_lead" not in meta
+    assert meta["answer_lead_withheld"] == "multi_unit_quote"
+    assert not text.startswith("Respuesta:") and "Finanzas" in text
+    # Quoting the single row keeps the headline.
+    row = "Más de 300 y hasta 1.500 euros | Finanzas"
+    client, _ = scripted(selection(row), verdict("Finanzas"))
+    text, _, meta = documentary_answer(client, "¿Quién aprueba un gasto de 800 euros?", sources)
+    assert text.startswith("Respuesta: Finanzas")
