@@ -47,7 +47,8 @@ export function Copilot({
 }) {
   const data = useWorkspaceData();
   const { refresh, setActions, setConversations, setSystem } = data;
-  const [view, setView] = useState<View>("Workspace");
+  // Chat-first: after sign-in the conversation is the product; the rest is one click away.
+  const [view, setView] = useState<View>("Copilot");
   const [viewBusy, setViewBusy] = useState(false);
   const viewRequest = useRef(0);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -137,6 +138,9 @@ export function Copilot({
     },
     [chat, deciding],
   );
+
+  const toggleMenu = useCallback(() => setMenuOpen((open) => !open), []);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
 
   const newConversation = useCallback(() => {
     chat.reset();
@@ -426,6 +430,8 @@ export function Copilot({
         conversationId={chat.conversationId}
         locked={locked}
         onView={changeView}
+        onToggle={toggleMenu}
+        onClose={closeMenu}
         onWorkspace={(id) => onWorkspace(id).catch((err) => setError(errorMessage(err)))}
         onConversation={openConversation}
         onNewConversation={newConversation}
@@ -436,7 +442,7 @@ export function Copilot({
           workspaceName={workspaceName}
           title={NAV_ITEMS.find((n) => n.view === view)?.label ?? view}
           menuOpen={menuOpen}
-          onMenu={() => setMenuOpen((open) => !open)}
+          onMenu={toggleMenu}
           isCopilot={view === "Copilot"}
           conversationTitle={conversationTitle}
           locked={locked}

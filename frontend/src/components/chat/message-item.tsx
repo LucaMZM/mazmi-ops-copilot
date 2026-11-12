@@ -1,9 +1,10 @@
 "use client";
 import { memo } from "react";
-import { ActionCard, AnswerText, Insufficient, SourceChip, Spinner } from "../product-ui";
+import { ActionCard, AnswerText, Insufficient, SourceChip } from "../product-ui";
 import type { Message, PendingAction, Source } from "../product-types";
 import type { Draft } from "@/hooks/use-chat";
 import { isAbstention } from "@/lib/format";
+import { RobotMark } from "../brand/robot-mark";
 
 type Props = {
   message: Message;
@@ -27,12 +28,15 @@ export const MessageItem = memo(function MessageItem({
     <article
       className={`messageRow ${m.role} ${m.failed ? "failed" : ""} ${m.fresh ? "enter" : ""}`}
     >
-      <div className="messageIdentity">
-        {m.role === "user" ? "Tú" : "MAZMI"}
-        {m.role === "assistant" && m.sources?.length ? (
-          <span className="identityHint">Respuesta documental</span>
-        ) : null}
-      </div>
+      {m.role === "user" ? (
+        <span className="srOnly">Tú:</span>
+      ) : (
+        <div className="messageIdentity">
+          <RobotMark size={18} />
+          MAZMI
+          {m.sources?.length ? <span className="identityHint">Respuesta documental</span> : null}
+        </div>
+      )}
       <div className="messageBody">
         {m.role === "assistant" && isAbstention(m.content) ? (
           <Insufficient
@@ -76,11 +80,19 @@ export const MessageItem = memo(function MessageItem({
 export function DraftMessage({ draft }: { draft: Draft }) {
   return (
     <article className="messageRow assistant draft" aria-busy="true">
-      <div className="messageIdentity">MAZMI</div>
+      <div className="messageIdentity">
+        <RobotMark size={18} className="thinking" />
+        MAZMI
+      </div>
       <div className="messageBody">
         {draft.text ? <div className="answerText streamingText">{draft.text}</div> : null}
         <div className="streamStatus" role="status">
-          <Spinner /> {draft.status || "Procesando…"}
+          <span className="statusDots" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          {draft.status || "Procesando…"}
         </div>
       </div>
     </article>

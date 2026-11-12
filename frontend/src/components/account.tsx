@@ -4,6 +4,7 @@ import { Layers, Quote, ShieldCheck } from "lucide-react";
 import { Copilot } from "./copilot";
 import { Spinner } from "./product-ui";
 import { applyTheme } from "@/hooks/use-theme";
+import { RobotMark } from "./brand/robot-mark";
 
 export type Account = {
   email: string;
@@ -109,8 +110,8 @@ export function AccountGate() {
       <div className="backdropScene" aria-hidden="true" />
       <section className="authStory">
         <div className="brand">
-          <span className="brandmark" aria-hidden="true">
-            M
+          <span className="brandTile large" aria-hidden="true">
+            <RobotMark size={26} className="blinking" />
           </span>
           <div>
             <b>MAZMI</b>

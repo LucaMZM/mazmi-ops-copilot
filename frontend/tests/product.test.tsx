@@ -116,9 +116,12 @@ function mount() {
 const nav = (name: string) =>
   fireEvent.click(screen.getByRole("button", { name }));
 
-test("workspace shows only ready compatible documents", async () => {
+test("opens in Copilot after sign-in; Workspace shows only ready compatible documents", async () => {
   mockBase();
   mount();
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Copilot");
+  expect(screen.getByLabelText("Mensaje al copiloto")).toBeInTheDocument();
+  nav("Workspace");
   await screen.findByText("Vacaciones.txt");
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
     "Workspace",
@@ -455,6 +458,7 @@ test("a failed configuration endpoint does not discard loaded documents", async 
       : Response.json(fetchBase(String(input))),
   );
   mount();
+  nav("Knowledge");
   await screen.findByText("Vacaciones.txt");
   expect(screen.getByRole("alert")).toHaveTextContent(
     "Configuración no disponible",

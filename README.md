@@ -12,6 +12,10 @@ Pila: Next.js 16 / React 19, FastAPI, PostgreSQL 17 con pgvector y Ollama (Qwen3
 
 ![Copilot: respuesta con citas literales](docs/screenshots/copilot.png)
 
+| Inicio de una consulta | Panel de secciones e historial |
+|---|---|
+| ![Bienvenida con el robot de MAZMI y el compositor centrado](docs/screenshots/copilot-empty.png) | ![Panel abierto desde la barra lateral flotante](docs/screenshots/panel.png) |
+
 | Conocimiento | Inspector de evidencia |
 |---|---|
 | ![Biblioteca de documentos](docs/screenshots/knowledge.png) | ![Pasaje almacenado tras una cita](docs/screenshots/source-inspector.png) |
