@@ -20,11 +20,11 @@ Pila: Next.js 16 / React 19, FastAPI, PostgreSQL 17 con pgvector y Ollama (Qwen3
 |---|---|
 | ![Biblioteca de documentos](docs/screenshots/knowledge.png) | ![Pasaje almacenado tras una cita](docs/screenshots/source-inspector.png) |
 
-| Aprobación humana | Tema claro (opcional) |
+| Aprobación humana | Configuración |
 |---|---|
-| ![Aprobación con consecuencias visibles](docs/screenshots/approvals.png) | ![Copilot en tema claro](docs/screenshots/copilot-light.png) |
+| ![Aprobación con consecuencias visibles](docs/screenshots/approvals.png) | ![Configuración efectiva del servidor](docs/screenshots/settings.png) |
 
-[Configuración](docs/screenshots/settings.png) · [Móvil](docs/screenshots/copilot-mobile.png) · [Procedencia de las capturas](docs/screenshots/README.md)
+[Móvil](docs/screenshots/copilot-mobile.png) · [Procedencia de las capturas](docs/screenshots/README.md)
 
 ## Cómo responde
 

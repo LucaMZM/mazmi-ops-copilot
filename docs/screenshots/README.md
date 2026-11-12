@@ -6,7 +6,7 @@ Capturas reales tomadas el 12 de noviembre de 2026 con Playwright (Chromium head
 - **Documentos:** los diez del corpus ficticio «Aurelia Logística», cargados en su propio workspace con `python -m app.presentation_corpus`.
 - **Respuestas:** generadas en el momento por el modelo local.
 
-Sin modo demo, sin claves y sin retoque ni composición: PNG escrito directamente por el navegador. Escritorio a 1440 × 900 en tema oscuro (el predeterminado) y una en claro, que se elige en Configuración; móvil a 390 × 844, sin desbordamiento horizontal medido.
+Sin modo demo, sin claves y sin retoque ni composición: PNG escrito directamente por el navegador. Todas en el tema oscuro, el predeterminado. Escritorio a 1440 × 900; móvil a 390 × 844, sin desbordamiento horizontal medido.
 
 Diseño «Project Glass» en escala de grises: barra lateral flotante con indicador de cristal, robot de MAZMI y conversación como pantalla inicial. Las capturas se tomaron con `prefers-reduced-motion: reduce` para que ninguna transición quede a medias.
 
