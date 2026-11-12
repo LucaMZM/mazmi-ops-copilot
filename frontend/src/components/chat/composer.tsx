@@ -19,7 +19,8 @@ type Props = {
 
 /**
  * The composer owns its draft text, so each keystroke re-renders only this component.
- * The capsule's tint follows the mode: understanding (ASK) or preparing an action (DO).
+ * Text on top, tools underneath (ChatGPT ergonomics). The mode switch keeps the safety
+ * boundary visible: violet while asking (ASK), amber while preparing an action (DO).
  */
 export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   { mode, onMode, busy, streaming, blocked, listening, onSend, onStop, onListen },
@@ -46,22 +47,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
 
   return (
     <div className={`composerDock mode-${mode.toLowerCase()}`}>
-      <form className="composer glass" onSubmit={submit}>
-        <div className="modeSwitch" role="group" aria-label="Modo de trabajo">
-          <span className="modeThumb" aria-hidden="true" />
-          {(["ASK", "DO"] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={mode === value}
-              className={mode === value ? "selected" : ""}
-              disabled={busy}
-              onClick={() => onMode(value)}
-            >
-              {value}
-            </button>
-          ))}
-        </div>
+      <form className="composer" onSubmit={submit}>
         <textarea
           ref={area}
           aria-label="Mensaje al copiloto"
@@ -80,30 +66,47 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
             }
           }}
         />
-        <div className="composerTools">
-          <button
-            type="button"
-            className={`iconButton mic ${listening ? "recording" : ""}`}
-            disabled={busy}
-            aria-pressed={listening}
-            aria-label={listening ? "Detener micrófono" : "Activar micrófono"}
-            onClick={onListen}
-          >
-            {listening ? <Square size={16} /> : <Mic size={17} />}
-          </button>
-          {streaming ? (
-            <button type="button" className="stopButton" onClick={onStop}>
-              <Square size={13} aria-hidden="true" /> Detener consulta
-            </button>
-          ) : (
+        <div className="composerRow">
+          <div className="modeSwitch" role="group" aria-label="Modo de trabajo">
+            <span className="modeThumb" aria-hidden="true" />
+            {(["ASK", "DO"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={mode === value}
+                className={mode === value ? "selected" : ""}
+                disabled={busy}
+                onClick={() => onMode(value)}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
+          <div className="composerTools">
             <button
-              aria-label="Enviar mensaje"
-              className="send"
-              disabled={!text.trim() || busy || blocked}
+              type="button"
+              className={`iconButton mic ${listening ? "recording" : ""}`}
+              disabled={busy}
+              aria-pressed={listening}
+              aria-label={listening ? "Detener micrófono" : "Activar micrófono"}
+              onClick={onListen}
             >
-              <ArrowUp size={18} />
+              {listening ? <Square size={16} /> : <Mic size={17} strokeWidth={1.75} />}
             </button>
-          )}
+            {streaming ? (
+              <button type="button" className="stopButton" onClick={onStop}>
+                <Square size={13} aria-hidden="true" /> Detener consulta
+              </button>
+            ) : (
+              <button
+                aria-label="Enviar mensaje"
+                className="send"
+                disabled={!text.trim() || busy || blocked}
+              >
+                <ArrowUp size={18} />
+              </button>
+            )}
+          </div>
         </div>
       </form>
       <p id="composer-hint" className="composerHint">

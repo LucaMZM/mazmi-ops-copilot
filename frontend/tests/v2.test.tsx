@@ -132,6 +132,8 @@ test("conversations can be renamed and archived from the open chat", async () =>
     return Response.json([]);
   });
   mount();
+  // The history lives in the panel, opened on purpose from the rail.
+  fireEvent.click(screen.getByRole("button", { name: "Mostrar nombres e historial" }));
   fireEvent.click((await screen.findAllByRole("button", { name: "Consulta antigua" }))[0]);
   fireEvent.click(await screen.findByLabelText("Renombrar conversación"));
   fireEvent.change(screen.getByLabelText("Nuevo título de la conversación"), { target: { value: "Nuevo título" } });
