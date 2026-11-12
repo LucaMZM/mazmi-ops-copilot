@@ -74,9 +74,9 @@ function ModelSection({ title, help, provider }: { title: string; help: string; 
 }
 
 const THEMES: [ThemePreference, string][] = [
-  ["system", "Sistema"],
-  ["light", "Claro"],
   ["dark", "Oscuro"],
+  ["light", "Claro"],
+  ["system", "Sistema"],
 ];
 
 export function SettingsView({

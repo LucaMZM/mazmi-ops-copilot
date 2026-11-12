@@ -124,7 +124,7 @@ export function WorkspaceView({
               ? "Ninguna propuesta se ejecuta hasta que la apruebas. Revisa su alcance antes de decidir."
               : "Las acciones que pidas en modo DO aparecerán aquí para tu aprobación."}
           </p>
-          <button className={pending.length ? "primary amber" : "ghost"} onClick={() => onView("Approvals")}>
+          <button className={pending.length ? "primary confirm" : "ghost"} onClick={() => onView("Approvals")}>
             Revisar aprobaciones
           </button>
         </section>

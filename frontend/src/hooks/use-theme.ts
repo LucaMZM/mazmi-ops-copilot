@@ -4,18 +4,20 @@ import { useCallback, useSyncExternalStore } from "react";
 
 export type ThemePreference = "system" | "light" | "dark";
 const KEY = "mazmi-theme";
+/** MAZMI is a dark interface; light and the OS preference remain an explicit choice. */
+export const DEFAULT: ThemePreference = "dark";
 const listeners = new Set<() => void>();
 
 function read(): ThemePreference {
   try {
     const value = window.localStorage.getItem(KEY);
-    return value === "light" || value === "dark" ? value : "system";
+    return value === "light" || value === "dark" || value === "system" ? value : DEFAULT;
   } catch {
-    return "system";
+    return DEFAULT;
   }
 }
 
-/** Apply the stored preference; "system" defers to prefers-color-scheme in CSS. */
+/** Apply the stored preference (dark unless chosen otherwise); "system" defers to the OS. */
 export function applyTheme(preference: ThemePreference = read()) {
   const root = document.documentElement;
   if (preference === "system") root.removeAttribute("data-theme");
@@ -29,11 +31,11 @@ export function useTheme(): [ThemePreference, (value: ThemePreference) => void] 
       return () => listeners.delete(listener);
     },
     read,
-    () => "system" as ThemePreference,
+    () => DEFAULT,
   );
   const set = useCallback((value: ThemePreference) => {
     try {
-      if (value === "system") window.localStorage.removeItem(KEY);
+      if (value === DEFAULT) window.localStorage.removeItem(KEY);
       else window.localStorage.setItem(KEY, value);
     } catch {
       // Storage may be blocked (private mode); the choice still applies to this page.

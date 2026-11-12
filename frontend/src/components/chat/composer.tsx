@@ -20,7 +20,7 @@ type Props = {
 /**
  * The composer owns its draft text, so each keystroke re-renders only this component.
  * Text on top, tools underneath (ChatGPT ergonomics). The mode switch keeps the safety
- * boundary visible: violet while asking (ASK), amber while preparing an action (DO).
+ * boundary visible: the active mode is a black pill, and DO lights the composer's edge.
  */
 export const Composer = forwardRef<ComposerHandle, Props>(function Composer(
   { mode, onMode, busy, streaming, blocked, listening, onSend, onStop, onListen },
