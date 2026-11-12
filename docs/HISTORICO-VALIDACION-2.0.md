@@ -168,7 +168,7 @@ Native PostgreSQL is a new isolated temporary cluster with random private creden
 
 ## Browser evidence and publication
 
-Real Next production server on loopback3000 proxies FastAPI on loopback8010. An unrelated pre-existing PHP service on8000 was left untouched. Browser checks: generated-account login; persisted conversation/history; real Qwen answer/citation; original stored source inspector; four indexed documents; approved/rejected proposal states; manual local verification and its result; mobile390×844 with document width390. These are browser interactions through the available Playwright/AX controls, not a newly installed Playwright test runner. Proposal execution/rejection and isolation were exercised through actual HTTP handlers; no claim of a second browser approval click. The eight original captures are unchanged; three additional authentic JPEGs show [source](docs/screenshots/ollama-source.jpg), [settings](docs/screenshots/ollama-settings.jpg), [mobile](docs/screenshots/ollama-mobile.jpg).
+Real Next production server on loopback3000 proxies FastAPI on loopback8010. An unrelated pre-existing PHP service on8000 was left untouched. Browser checks: generated-account login; persisted conversation/history; real Qwen answer/citation; original stored source inspector; four indexed documents; approved/rejected proposal states; manual local verification and its result; mobile390×844 with document width390. These are browser interactions through the available Playwright/AX controls, not a newly installed Playwright test runner. Proposal execution/rejection and isolation were exercised through actual HTTP handlers; no claim of a second browser approval click. The eight original captures are unchanged; three additional authentic JPEGs showed the source inspector, settings and mobile (no longer in the repository; see Git history).
 
 Publication preflight: reviewed 120 public source/report/image files; no real vendor-key/token/private-key signatures or forbidden local files found. Detected database URLs are documented local development/CI placeholders, not the private random validation DSNs. Both API-key example values are blank; real credentials, databases, logs, dependencies and model weights stay outside Git. Current npm audit: **0 production advisories**, **5 high development advisories** in the existing ESLint dependency chain; no forced downgrade/fix was applied. Remote CI is checked by the coordinator before closing. The existing README, badges, Mermaid and eight demo captures are preserved. Canonical Git metadata remains outside iCloud; no reinitialization, history deletion or force push.
 
@@ -273,7 +273,7 @@ La evaluación de retrieval se repitió con PostgreSQL real y embeddings sintét
 - `pip check` correcto; dependencias bloqueadas restauradas en entornos temporales porque los anteriores ya no existían. No se añadieron librerías al producto; se reutilizó un formatter instalado.
 - PostgreSQL temporal 17.11 / pgvector0.8.6, dos bases aisladas para pruebas y demo. No Docker, modelos locales ni migraciones sobre bases existentes del usuario. No migración005.
 - Navegador real: login, cambio de workspace, subida TXT e indexación, pregunta con cita, apertura de fuente y de chunks almacenados, aprobación y estado ejecutado, historial móvil, configuración de demo y persistencia tras reiniciar backend. Viewports 1440×1000 y390×844; ancho390 sin overflow horizontal.
-- Capturas auténticas guardadas en evidence: workspace-product-desktop.jpg, knowledge-product-desktop.jpg, approvals-product-desktop.jpg, source-inspector-desktop.jpg, settings-product-desktop.jpg y chat-product-mobile.jpg. No son diseños generados.
+- Capturas auténticas del diseño de entonces (no eran diseños generados): workspace, knowledge, aprobaciones, inspector, configuración y chat móvil. Se retiraron del repositorio el 12 de noviembre de 2026 y siguen en el historial de Git (`git show f16d467:evidence/`).
 
 ## Qué falta
 
@@ -477,12 +477,7 @@ Frontend Next en `127.0.0.1:3001`, proxy hacia FastAPI en `127.0.0.1:8001`, aute
 7. Dictado no soportado (API del navegador deshabilitada en la prueba) → error claro → nueva consulta escrita completada.
 8. PDF inválido → error visible; eliminación de documento completada.
 
-Capturas reales con datos sintéticos y OpenAI simulado:
-
-- [Knowledge](evidence/knowledge-desktop.png)
-- [Chat, fuentes y propuesta](evidence/chat-proposal-desktop.png)
-- [Auditoría](evidence/activity-desktop.png)
-- [Chat móvil](evidence/chat-mobile.png)
+Se tomaron capturas reales con datos sintéticos y OpenAI simulado. Correspondían al diseño de entonces y se retiraron del repositorio el 12 de noviembre de 2026. Siguen en el historial de Git, por ejemplo `git show f16d467:evidence/knowledge-desktop.png`. Las capturas vigentes están en [docs/screenshots](screenshots/README.md).
 
 Los tests backend cubren además ausencia de API key (503 controlado), argumentos inválidos, consultas vacías, fallos del proveedor sin exponer secretos, aprobación concurrente sin duplicados, aislamiento de workspaces, autenticación, CSRF, extracción PDF/DOCX y eliminación de chunks. La verificación del pipeline no demuestra calidad semántica de modelos reales.
 
