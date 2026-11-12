@@ -73,7 +73,7 @@ export function ActionCard({
         <button className="ghost" disabled={busy} onClick={() => onDecide(action, false)}>
           <X size={16} aria-hidden="true" /> Rechazar
         </button>
-        <button className="primary amber" disabled={busy} onClick={() => onDecide(action, true)}>
+        <button className="primary confirm" disabled={busy} onClick={() => onDecide(action, true)}>
           <Check size={16} aria-hidden="true" /> Confirmar
         </button>
       </div>

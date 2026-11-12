@@ -5,10 +5,10 @@
  * - Glass is for chrome only (sidebar, topbar, composer, sheets): at most four blurred
  *   layers on screen. Content sits on frosted surfaces WITHOUT backdrop blur, which keeps
  *   scrolling and streaming cheap to paint.
- * - Palette (Project Glass): soft near-black and charcoal in dark, cool off-white in light,
- *   warm white text, zinc greys for secondary text and icons. One discreet violet marks
- *   what can be pressed or followed and the ASK mode; amber means an action that will
- *   execute (DO, approvals). Green and red keep their meaning for success and failure.
+ * - Palette: a dark greyscale interface (light remains an explicit choice). No hue except a
+ *   muted red for destructive actions and errors. Black marks what is selected (the active
+ *   mode); white is the main action (send, confirm, new conversation). DO is told apart by
+ *   a bright edge on the composer and the proposal card, plus its wording.
  * - The navigation rail is charcoal glass in both themes: the one recognizable object.
  *   A single glass capsule travels between its icons.
  * - Background: a static, very faint dot grid. No blobs, no glows, no animated blur.
@@ -24,11 +24,6 @@
   --zinc-50: #fafafa;
   --zinc-400: #a1a1aa;
   --zinc-900: #18181b;
-  --violet-400: #a78bfa;
-  --violet-500: #8b5cf6;
-  --violet-600: #6d3fe0;
-  --amber-600: #a65f0e;
-  --amber-700: #8c4f0c;
   --shadow-tint: 20, 20, 26;
 
   /* Semantic tokens */
@@ -52,20 +47,20 @@
   --primary: var(--zinc-900);
   --primary-hover: #2a2a2f;
   --on-primary: var(--zinc-50);
-  --accent: var(--violet-600);
-  --on-accent: #ffffff;
-  --accent-soft: rgba(139, 92, 246, 0.12);
-  --mode-ask: var(--violet-600);
-  --on-mode-ask: #ffffff;
-  --decision: var(--amber-600);
-  --decision-strong: var(--amber-700);
-  --decision-soft: #f6ead6;
-  --on-decision: #fffaf2;
+  --accent: #3f3f46;
+  --on-accent: #fafafa;
+  --accent-soft: rgba(24, 24, 27, 0.07);
+  --mode-ask: var(--zinc-900);
+  --on-mode-ask: #fafafa;
+  --decision: var(--zinc-900);
+  --decision-strong: #2a2a2f;
+  --decision-soft: rgba(24, 24, 27, 0.05);
+  --on-decision: #fafafa;
   --danger: #b3403f;
   --danger-soft: #f7e4e3;
-  --success: #2f7a50;
-  --success-soft: #e2f1e7;
-  --focus: var(--violet-500);
+  --success: #3f3f46;
+  --success-soft: rgba(24, 24, 27, 0.07);
+  --focus: #52525b;
 
   /* Navigation rail: charcoal glass in both themes. */
   --rail-bg: rgba(24, 24, 27, 0.9);
@@ -79,7 +74,7 @@
   --rail-pill-border: rgba(255, 255, 255, 0.14);
   --rail-pill-highlight: rgba(255, 255, 255, 0.22);
   --robot-visor: #1c1c1f;
-  --robot-eye: var(--violet-400);
+  --robot-eye: #f5f5f7;
 
   /* Type */
   --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
@@ -146,20 +141,20 @@
     --primary: #f5f5f7;
     --primary-hover: #ffffff;
     --on-primary: #18181b;
-    --accent: var(--violet-400);
-    --on-accent: #17171a;
-    --accent-soft: rgba(167, 139, 250, 0.14);
-    --mode-ask: var(--violet-400);
-    --on-mode-ask: #17171a;
-    --decision: #eda24c;
-    --decision-strong: #f5b968;
-    --decision-soft: rgba(237, 162, 76, 0.14);
-    --on-decision: #1d1306;
+    --accent: #d4d4d8;
+    --on-accent: #0b0b0d;
+    --accent-soft: rgba(255, 255, 255, 0.08);
+    --mode-ask: #0b0b0d;
+    --on-mode-ask: #f5f5f7;
+    --decision: #f5f5f7;
+    --decision-strong: #ffffff;
+    --decision-soft: rgba(255, 255, 255, 0.07);
+    --on-decision: #0b0b0d;
     --danger: #f2837b;
     --danger-soft: rgba(242, 131, 123, 0.13);
-    --success: #63cf94;
-    --success-soft: rgba(99, 207, 148, 0.13);
-    --focus: var(--violet-400);
+    --success: #c9c9d0;
+    --success-soft: rgba(255, 255, 255, 0.07);
+    --focus: #d4d4d8;
     --rail-bg: rgba(28, 28, 31, 0.78);
     --rail-border: rgba(255, 255, 255, 0.09);
     --rail-shadow: 0 20px 50px -18px rgba(0, 0, 0, 0.8), 0 2px 8px rgba(0, 0, 0, 0.35);
@@ -188,20 +183,20 @@
   --primary: #f5f5f7;
   --primary-hover: #ffffff;
   --on-primary: #18181b;
-  --accent: var(--violet-400);
-  --on-accent: #17171a;
-  --accent-soft: rgba(167, 139, 250, 0.14);
-  --mode-ask: var(--violet-400);
-  --on-mode-ask: #17171a;
-  --decision: #eda24c;
-  --decision-strong: #f5b968;
-  --decision-soft: rgba(237, 162, 76, 0.14);
-  --on-decision: #1d1306;
+  --accent: #d4d4d8;
+  --on-accent: #0b0b0d;
+  --accent-soft: rgba(255, 255, 255, 0.08);
+  --mode-ask: #0b0b0d;
+  --on-mode-ask: #f5f5f7;
+  --decision: #f5f5f7;
+  --decision-strong: #ffffff;
+  --decision-soft: rgba(255, 255, 255, 0.07);
+  --on-decision: #0b0b0d;
   --danger: #f2837b;
   --danger-soft: rgba(242, 131, 123, 0.13);
-  --success: #63cf94;
-  --success-soft: rgba(99, 207, 148, 0.13);
-  --focus: var(--violet-400);
+  --success: #c9c9d0;
+  --success-soft: rgba(255, 255, 255, 0.07);
+  --focus: #d4d4d8;
   --rail-bg: rgba(28, 28, 31, 0.78);
   --rail-border: rgba(255, 255, 255, 0.09);
   --rail-shadow: 0 20px 50px -18px rgba(0, 0, 0, 0.8), 0 2px 8px rgba(0, 0, 0, 0.35);
@@ -319,12 +314,12 @@ time {
 .primary:hover:not(:disabled) {
   background: var(--primary-hover);
 }
-.primary.amber {
+.primary.confirm {
   background: var(--decision);
   color: var(--on-decision);
   box-shadow: 0 2px 8px -4px rgba(var(--shadow-tint), 0.4);
 }
-.primary.amber:hover:not(:disabled) {
+.primary.confirm:hover:not(:disabled) {
   background: var(--decision-strong);
 }
 .ghost {
@@ -732,7 +727,7 @@ time {
   transform: scale(0.94);
 }
 :is(.railNew, .railItem, .railAvatar):focus-visible {
-  outline: 2px solid var(--violet-400);
+  outline: 2px solid #d4d4d8;
   outline-offset: 2px;
 }
 /* The glass capsule: translucent, a hairline edge, a reflection on its upper half. */
@@ -763,8 +758,8 @@ time {
   height: 17px;
   padding: 0 4px;
   border-radius: var(--radius-pill);
-  background: #eda24c;
-  color: #1d1306;
+  background: #f5f5f7;
+  color: #0b0b0d;
   font-size: 0.6875rem;
   font-weight: 750;
   line-height: 17px;
@@ -786,11 +781,11 @@ time {
   height: 34px;
   border: 0;
   border-radius: 50%;
-  background: var(--violet-600);
-  color: #ffffff;
+  background: #0b0b0d;
+  color: #f5f5f7;
   font-size: var(--text-sm);
   font-weight: 700;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22);
   transition: transform var(--press) var(--ease-out);
 }
 /* One tooltip for the rail. Its position jumps (never slides) between items; only its
@@ -977,7 +972,7 @@ time {
   color: #f5f5f7;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 2px 8px -3px rgba(0, 0, 0, 0.45);
   --robot-visor: #1c1c1f;
-  --robot-eye: var(--violet-400);
+  --robot-eye: #f5f5f7;
 }
 .brandTile.large {
   width: 44px;
@@ -1610,7 +1605,7 @@ time {
 
 /* The composer: the one bold element. */
 .composerDock {
-  /* The safety boundary stays visible: violet while asking, amber while preparing an action. */
+  /* The active mode is a black pill in both modes; DO is marked by the composer's bright edge. */
   --mode: var(--mode-ask);
   --on-mode: var(--on-mode-ask);
   position: relative;
@@ -1622,8 +1617,8 @@ time {
   padding: 0 var(--space-3) var(--space-2);
 }
 .composerDock.mode-do {
-  --mode: var(--decision);
-  --on-mode: var(--on-decision);
+  --mode: var(--mode-ask);
+  --on-mode: var(--on-mode-ask);
 }
 .composerDock::before {
   content: "";
@@ -1649,9 +1644,9 @@ time {
     box-shadow var(--medium) ease;
 }
 .composer:focus-within {
-  border-color: color-mix(in srgb, var(--mode) 55%, transparent);
+  border-color: color-mix(in srgb, var(--ink) 34%, transparent);
   box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--mode) 14%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--ink) 7%, transparent),
     var(--glass-shadow),
     inset 0 1px 0 var(--glass-highlight);
 }
@@ -1734,8 +1729,8 @@ time {
   height: 36px;
   border: 0;
   border-radius: 50%;
-  background: var(--mode);
-  color: var(--on-mode);
+  background: var(--primary);
+  color: var(--on-primary);
   transition:
     background-color var(--medium) ease,
     transform var(--fast) var(--ease),
@@ -1817,7 +1812,7 @@ time {
   color: #f5f5f7;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 14px 30px -14px rgba(var(--shadow-tint), 0.55);
   --robot-visor: #1c1c1f;
-  --robot-eye: var(--violet-400);
+  --robot-eye: #f5f5f7;
 }
 .welcomeMark,
 .promptList {
@@ -1835,8 +1830,9 @@ time {
   justify-content: space-between;
   gap: var(--space-2);
 }
-.mode-do .composer {
-  border-color: color-mix(in srgb, var(--decision) 38%, var(--line-strong));
+.mode-do .composer,
+.mode-do .composer:focus-within {
+  border-color: color-mix(in srgb, var(--ink) 55%, transparent);
 }
 .statusDots {
   display: inline-flex;

@@ -65,3 +65,14 @@ test("the robot is decorative unless it is given a name", () => {
   rerender(<RobotMark title="MAZMI" />);
   expect(screen.getByRole("img", { name: "MAZMI" })).toBeInTheDocument();
 });
+
+test("the interface is dark unless another theme was chosen", async () => {
+  const { applyTheme } = await import("../src/hooks/use-theme");
+  window.localStorage.removeItem("mazmi-theme");
+  applyTheme();
+  expect(document.documentElement).toHaveAttribute("data-theme", "dark");
+  window.localStorage.setItem("mazmi-theme", "system");
+  applyTheme();
+  expect(document.documentElement).not.toHaveAttribute("data-theme");
+  window.localStorage.removeItem("mazmi-theme");
+});
