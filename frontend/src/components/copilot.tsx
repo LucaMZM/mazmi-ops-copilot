@@ -8,10 +8,14 @@ import type {
   DocumentItem,
   Mode,
   PendingAction,
-  Source,
+  Message,
   View,
 } from "./product-types";
 import { EmptyState, Inspector, Spinner } from "./product-ui";
+import { EvidenceExplorer } from "./evidence/evidence-explorer";
+import { RagInspector } from "./diagnostics/rag-inspector";
+import { CommandPalette, type Command } from "./command-palette";
+import { FilePlus2, MessageSquarePlus, MessagesSquare, PanelLeftOpen, ShieldCheck, Activity as ActivityIcon } from "lucide-react";
 import { ChatView } from "./chat/chat-view";
 import type { ComposerHandle } from "./chat/composer";
 import { NAV_ITEMS, Sidebar } from "./layout/sidebar";
@@ -22,6 +26,7 @@ import { KnowledgeView } from "./views/knowledge-view";
 import { ProviderContext, SettingsView } from "./views/settings-view";
 import { WorkspaceView } from "./views/workspace-view";
 import { useChat } from "@/hooks/use-chat";
+import { useDiagnostics } from "@/hooks/use-diagnostics";
 import { useVoice } from "@/hooks/use-voice";
 import { useWorkspaceData, type ResourceName } from "@/hooks/use-workspace-data";
 import { ApiError, errorMessage, jsonBody, request } from "@/lib/api";
@@ -64,7 +69,11 @@ export function Copilot({
   const [checkingLocal, setCheckingLocal] = useState(false);
   const [localCheckError, setLocalCheckError] = useState("");
   const localCheckRequest = useRef(false);
-  const [inspected, setInspected] = useState<Source | null>(null);
+  // The evidence explorer is anchored to one answer; `index` is the source on screen.
+  const [inspected, setInspected] = useState<{ message: Message; index: number } | null>(null);
+  const [diagnosed, setDiagnosed] = useState<{ message: Message; occurrence: number } | null>(null);
+  const [diagnosticsOn, setDiagnosticsOn] = useDiagnostics();
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [inspectDoc, setInspectDoc] = useState<DocumentItem | null>(null);
   const [chunkPage, setChunkPage] = useState<ChunkPage | null>(null);
   const [inspectBusy, setInspectBusy] = useState(false);
@@ -89,6 +98,18 @@ export function Copilot({
     return () => {
       mounted.current = false;
     };
+  }, []);
+
+  // ⌘K / Ctrl+K opens the command palette from anywhere, including the composer.
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === "k" && !e.isComposing) {
+        e.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
   }, []);
 
   // While a synchronous upload runs, reflect server-side status changes in Knowledge.
@@ -359,10 +380,23 @@ export function Copilot({
     }
   }
 
-  const onSource = useCallback((source: Source) => {
-    setInspected(source);
+  const onSource = useCallback((message: Message, index: number) => {
+    setInspected({ message, index });
     setInspectDoc(null);
+    setDiagnosed(null);
   }, []);
+  const messages = chat.messages;
+  const onDiagnose = useCallback(
+    (message: Message) => {
+      // Several answers can share the same retrieved chunks; their order disambiguates.
+      const ids = (m: Message) => (m.sources ?? []).map((s) => s.chunk_id).join(",");
+      const same = messages.filter((m) => m.role === "assistant" && ids(m) === ids(message));
+      setDiagnosed({ message, occurrence: Math.max(0, same.indexOf(message)) });
+      setInspected(null);
+      setInspectDoc(null);
+    },
+    [messages],
+  );
   // Stable callback for memoized messages; always calls the latest `decide`.
   const decideRef = useRef(decide);
   useEffect(() => {
@@ -372,6 +406,84 @@ export function Copilot({
     (action: PendingAction, approved: boolean) => void decideRef.current(action, approved),
     [],
   );
+
+  const commands: Command[] = [
+    {
+      id: "new",
+      group: "Acciones",
+      label: "Nueva conversación",
+      icon: <MessageSquarePlus size={16} strokeWidth={1.75} />,
+      disabled: locked,
+      run: newConversation,
+    },
+    {
+      id: "ask",
+      group: "Acciones",
+      label: "Modo ASK: consultar documentos",
+      keywords: "preguntar",
+      icon: <MessagesSquare size={16} strokeWidth={1.75} />,
+      hint: mode === "ASK" ? "Activo" : undefined,
+      disabled: chat.busy !== "idle",
+      run: () => {
+        setMode("ASK");
+        void changeView("Copilot");
+      },
+    },
+    {
+      id: "do",
+      group: "Acciones",
+      label: "Modo DO: preparar una acción",
+      keywords: "ticket propuesta",
+      icon: <ShieldCheck size={16} strokeWidth={1.75} />,
+      hint: mode === "DO" ? "Activo" : undefined,
+      disabled: chat.busy !== "idle",
+      run: () => {
+        setMode("DO");
+        void changeView("Copilot");
+      },
+    },
+    {
+      id: "upload",
+      group: "Acciones",
+      label: "Subir documento",
+      keywords: "pdf docx indexar",
+      icon: <FilePlus2 size={16} strokeWidth={1.75} />,
+      disabled: uploading,
+      run: () => fileRef.current?.click(),
+    },
+    {
+      id: "panel",
+      group: "Acciones",
+      label: "Mostrar workspace e historial",
+      keywords: "panel cambiar workspace",
+      icon: <PanelLeftOpen size={16} strokeWidth={1.75} />,
+      run: () => setMenuOpen(true),
+    },
+    {
+      id: "diagnostics",
+      group: "Acciones",
+      label: diagnosticsOn ? "Desactivar diagnóstico RAG" : "Activar diagnóstico RAG",
+      keywords: "pipeline depurar inspector",
+      icon: <ActivityIcon size={16} strokeWidth={1.75} />,
+      run: () => setDiagnosticsOn(!diagnosticsOn),
+    },
+    ...NAV_ITEMS.map(({ view: next, label, icon: Icon }) => ({
+      id: `view-${next}`,
+      group: "Ir a",
+      label,
+      icon: <Icon size={16} strokeWidth={1.75} />,
+      hint: view === next ? "Aquí" : undefined,
+      run: () => void changeView(next),
+    })),
+    ...data.conversations.map((c) => ({
+      id: `conversation-${c.id}`,
+      group: "Conversaciones",
+      label: c.title,
+      icon: <MessagesSquare size={16} strokeWidth={1.75} />,
+      disabled: locked,
+      run: () => void openConversation(c.id),
+    })),
+  ];
 
   const shownError = error || chat.error || data.loadError;
   const feedback = (
@@ -443,6 +555,7 @@ export function Copilot({
           title={NAV_ITEMS.find((n) => n.view === view)?.label ?? view}
           menuOpen={menuOpen}
           onMenu={toggleMenu}
+          onPalette={() => setPaletteOpen(true)}
           isCopilot={view === "Copilot"}
           conversationTitle={conversationTitle}
           locked={locked}
@@ -468,6 +581,7 @@ export function Copilot({
             onListen={() => void voice.listen((text) => composer.current?.setText(text))}
             onSource={onSource}
             onDecide={onDecide}
+            onDiagnose={diagnosticsOn && chat.conversationId ? onDiagnose : undefined}
             feedback={feedback}
             context={<ProviderContext system={data.system} />}
           />
@@ -554,35 +668,27 @@ export function Copilot({
           if (file) void upload(file);
         }}
       />
-      {inspected && (
-        <Inspector
-          title={inspected.filename}
-          subtitle={[
-            inspected.section,
-            inspected.page ? `Página ${inspected.page}` : "Sin páginas fiables",
-            `Fragmento #${inspected.chunk_id}`,
-          ]
-            .filter(Boolean)
-            .join(", ")}
+      {inspected && inspected.message.sources?.length ? (
+        <EvidenceExplorer
+          answer={inspected.message.content}
+          sources={inspected.message.sources}
+          index={Math.min(inspected.index, inspected.message.sources.length - 1)}
+          documents={data.documents}
+          onIndex={(index) => setInspected((current) => (current ? { ...current, index } : current))}
           onClose={() => setInspected(null)}
-        >
-          <h3 className="inspectorLabel">Pasaje almacenado completo</h3>
-          <blockquote>{inspected.excerpt}</blockquote>
-          <p className="footnote">
-            Similitud {inspected.score.toFixed(3)}: mide cercanía, no certeza ni aplicabilidad. La
-            respuesta cita frases literales de este pasaje.
-          </p>
-          {inspected.document_id && (
-            <button
-              className="ghost"
-              onClick={() =>
-                inspectDocument({ id: inspected.document_id!, filename: inspected.filename } as DocumentItem)
-              }
-            >
-              Ver todos los fragmentos del documento
-            </button>
-          )}
-        </Inspector>
+          onDocument={(source) =>
+            inspectDocument({ id: source.document_id!, filename: source.filename } as DocumentItem)
+          }
+        />
+      ) : null}
+      {paletteOpen && <CommandPalette commands={commands} onClose={() => setPaletteOpen(false)} />}
+      {diagnosed && chat.conversationId && (
+        <RagInspector
+          conversationId={chat.conversationId}
+          sources={diagnosed.message.sources ?? []}
+          occurrence={diagnosed.occurrence}
+          onClose={() => setDiagnosed(null)}
+        />
       )}
       {inspectDoc && (
         <Inspector

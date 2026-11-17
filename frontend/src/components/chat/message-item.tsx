@@ -1,7 +1,8 @@
 "use client";
 import { memo } from "react";
+import { Activity } from "lucide-react";
 import { ActionCard, AnswerText, Insufficient, SourceChip } from "../product-ui";
-import type { Message, PendingAction, Source } from "../product-types";
+import type { Message, PendingAction } from "../product-types";
 import type { Draft } from "@/hooks/use-chat";
 import { isAbstention } from "@/lib/format";
 import { RobotMark } from "../brand/robot-mark";
@@ -9,8 +10,11 @@ import { RobotMark } from "../brand/robot-mark";
 type Props = {
   message: Message;
   deciding: boolean;
-  onSource: (source: Source) => void;
+  /** Opens the evidence explorer on source `index` (0-based) of this message. */
+  onSource: (message: Message, index: number) => void;
   onDecide: (action: PendingAction, approved: boolean) => void;
+  /** Present only in diagnostic mode, and only for answers that consulted documents. */
+  onDiagnose?: (message: Message) => void;
 };
 
 /** One committed message. Memoized: streaming and typing never re-render history. */
@@ -19,6 +23,7 @@ export const MessageItem = memo(function MessageItem({
   deciding,
   onSource,
   onDecide,
+  onDiagnose,
 }: Props) {
   const cited = new Set(
     Array.from(m.content.matchAll(/\[(\d+)\]/g), (match) => Number(match[1])),
@@ -44,7 +49,11 @@ export const MessageItem = memo(function MessageItem({
             kind={verificationFailure ? "verification" : undefined}
           />
         ) : (
-          <AnswerText text={m.content} sources={m.sources ?? []} onSource={onSource} />
+          <AnswerText
+            text={m.content}
+            sources={m.sources ?? []}
+            onSource={(_, n) => onSource(m, n - 1)}
+          />
         )}
         {m.failed && (
           <small className="errorText">
@@ -64,11 +73,16 @@ export const MessageItem = memo(function MessageItem({
                   source={source}
                   index={j + 1}
                   selected={cited.has(j + 1)}
-                  onOpen={() => onSource(source)}
+                  onOpen={() => onSource(m, j)}
                 />
               ))}
             </div>
           </section>
+        )}
+        {onDiagnose && m.role === "assistant" && m.sources && m.sources.length > 0 && (
+          <button className="diagnoseButton" onClick={() => onDiagnose(m)}>
+            <Activity size={14} strokeWidth={1.75} aria-hidden="true" /> Diagnóstico RAG
+          </button>
         )}
         {m.pending && <ActionCard action={m.pending} busy={deciding} onDecide={onDecide} />}
       </div>

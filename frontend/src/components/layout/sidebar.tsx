@@ -29,6 +29,7 @@ export const NAV_ITEMS = [
 const ICON = { size: 20, strokeWidth: 1.75 } as const;
 const TIP_DELAY = 420;
 const TIP_WARM = 450;
+const MAGNET_RANGE = 110;
 
 type Props = {
   account: Account;
@@ -90,6 +91,46 @@ export const Sidebar = memo(function Sidebar(props: Props) {
     observer.observe(nav);
     return () => observer.disconnect();
   }, [view]);
+
+  // Magnetic rail (after Componentry's Magnetic Dock, without its dependency): icons near the
+  // pointer grow a little and lean out. Only icons move, never the buttons or the capsule,
+  // so hit areas and the active indicator stay put. Off for touch and reduced motion.
+  useEffect(() => {
+    const root = rail.current;
+    const nav = navRef.current;
+    if (!root || !nav || typeof window.matchMedia !== "function") return;
+    const allowed = () =>
+      window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 768px)").matches &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let frame = 0;
+    let pointerY = 0;
+    const items = () => Array.from(root.querySelectorAll<HTMLElement>(".railItem, .railNew"));
+    const update = () => {
+      frame = 0;
+      for (const item of items()) {
+        const box = item.getBoundingClientRect();
+        const distance = Math.abs(pointerY - (box.top + box.height / 2));
+        item.style.setProperty("--mag", Math.max(0, 1 - distance / MAGNET_RANGE).toFixed(3));
+      }
+    };
+    const move = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse" || !allowed()) return;
+      pointerY = e.clientY;
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    const leave = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+      for (const item of items()) item.style.setProperty("--mag", "0");
+    };
+    root.addEventListener("pointermove", move);
+    root.addEventListener("pointerleave", leave);
+    return () => {
+      root.removeEventListener("pointermove", move);
+      root.removeEventListener("pointerleave", leave);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
 
   return (
     <>

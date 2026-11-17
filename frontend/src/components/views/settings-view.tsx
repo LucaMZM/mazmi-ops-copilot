@@ -4,6 +4,7 @@ import { Badge, EmptyState } from "../product-ui";
 import type { ProviderInfo, SystemInfo } from "../product-types";
 import { date } from "@/lib/format";
 import { useTheme, type ThemePreference } from "@/hooks/use-theme";
+import { useDiagnostics } from "@/hooks/use-diagnostics";
 
 export function ProviderContext({ system }: { system: SystemInfo | null }) {
   if (!system) return null;
@@ -99,6 +100,7 @@ export function SettingsView({
   onCheckLocal: () => Promise<void>;
 }) {
   const [theme, setTheme] = useTheme();
+  const [diagnostics, setDiagnostics] = useDiagnostics();
   return (
     <div className="pageSection settingsPage">
       <header className="pageIntro">
@@ -286,6 +288,29 @@ export function SettingsView({
               onClick={() => setTheme(value)}
             >
               {label}
+            </button>
+          ))}
+        </div>
+      </section>
+      <section className="settingSection surface">
+        <div>
+          <h3>Diagnóstico RAG</h3>
+          <p>
+            Añade a cada respuesta documental un botón con las etapas del pipeline: candidatos,
+            puntuaciones, tiempos y llamadas al modelo, leídos del registro del servidor. Nunca
+            muestra el texto de preguntas ni documentos. Se guarda solo en este navegador.
+          </p>
+        </div>
+        <div className="segmentedChoice" role="radiogroup" aria-label="Diagnóstico RAG">
+          {([false, true] as const).map((value) => (
+            <button
+              key={String(value)}
+              role="radio"
+              aria-checked={diagnostics === value}
+              className={diagnostics === value ? "active" : ""}
+              onClick={() => setDiagnostics(value)}
+            >
+              {value ? "Activado" : "Desactivado"}
             </button>
           ))}
         </div>

@@ -39,6 +39,8 @@ export type Source = {
   excerpt: string;
   score: number;
   section?: string | null;
+  /** The document was replaced by a newer version; kept only when the question asks for it. */
+  superseded?: boolean;
 };
 export type Conversation = {
   id: string;
@@ -116,3 +118,47 @@ export type ChatResult = {
   pending_action: PendingAction | null;
 };
 export type Mode = "ASK" | "DO";
+
+/** One answered turn read back from the audit record: numbers and short labels only. */
+export type TurnDiagnostics = {
+  created_at: string;
+  recorded_ms: number | null;
+  mode: string | null;
+  model: string | null;
+  generation_provider: string | null;
+  evidence_policy: string | null;
+  abstention_reason: string | null;
+  answer_lead_withheld: string | null;
+  duration_ms: number | null;
+  retrieval_ms: number | null;
+  retrieved_chunks: number | null;
+  model_calls: number | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  citations: number[];
+  source_chunk_ids: number[];
+  superseded_ignored: number[];
+  model_assessment_performed: boolean;
+  retrieval: {
+    strategy: string | null;
+    lexical_query_mode: string | null;
+    embedding_collection: string | null;
+    abstention_reason: string | null;
+    duration_ms: number | null;
+    embedding_ms: number | null;
+    vector_candidates: number | null;
+    lexical_candidates: number | null;
+    unique_candidates: number | null;
+    selected: {
+      chunk_id: number | null;
+      score: number | null;
+      rrf_score: number | null;
+      vector_rank: number | null;
+      lexical_rank: number | null;
+      lexical_score: number | null;
+    }[];
+  };
+  assessment: Record<string, string | number | boolean | null>;
+  model_calls_detail: Record<string, string | number | boolean | null>[];
+  tools: { name: string | null; result_count: number | null; duration_ms: number | null }[];
+};
