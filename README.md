@@ -16,9 +16,13 @@ Pila: Next.js 16 / React 19, FastAPI, PostgreSQL 17 con pgvector y Ollama (Qwen3
 |---|---|
 | ![Bienvenida con el robot de MAZMI y el compositor centrado](docs/screenshots/copilot-empty.png) | ![Panel abierto desde la barra lateral flotante](docs/screenshots/panel.png) |
 
-| Conocimiento | Inspector de evidencia |
+| Evidence Explorer | Diagnóstico RAG |
 |---|---|
-| ![Biblioteca de documentos](docs/screenshots/knowledge.png) | ![Pasaje almacenado tras una cita](docs/screenshots/source-inspector.png) |
+| ![Fuente citada con su frase literal resaltada y navegación entre fuentes](docs/screenshots/source-inspector.png) | ![Etapas del pipeline con métricas medidas por el servidor](docs/screenshots/rag-inspector.png) |
+
+| Conocimiento | Paleta de comandos (⌘K) |
+|---|---|
+| ![Biblioteca de documentos](docs/screenshots/knowledge.png) | ![Paleta para ir a secciones, acciones y conversaciones](docs/screenshots/command-palette.png) |
 
 | Aprobación humana | Configuración |
 |---|---|
@@ -33,6 +37,11 @@ Pila: Next.js 16 / React 19, FastAPI, PostgreSQL 17 con pgvector y Ollama (Qwen3
 3. **Evidencia verificada.** Guardas deterministas comprueban alcance, hechos pedidos, condiciones y contradicciones literales. Después, el modelo copia una cita literal por cada parte de la pregunta; **el servidor verifica que cada cita existe en el pasaje que nombra**, y una segunda llamada acotada confirma que esas citas contienen el dato pedido. Cualquier fallo es una abstención.
 4. **Respuesta.** El servidor muestra frases literales del pasaje almacenado, con documento, sección y un identificador de cita, precedidas de una línea breve con el dato cuando ese dato aparece tal cual en la cita. El texto que ve el usuario nunca lo escribe el modelo.
 5. **Versiones.** Un documento que declara estar sustituido o fuera de vigor no se usa para preguntas sobre la situación actual; sí para preguntas sobre esa versión, indicándolo.
+
+**Verificable desde la interfaz.**
+- **Evidence Explorer:** cada cita abre un panel con el pasaje almacenado completo, sus metadatos (sección, página, fragmento, similitud, versión indexada y modelo de embeddings) y, resaltadas, las frases literales que muestra la respuesta. Se puede navegar entre todas las fuentes de la respuesta con botones o con ← y →.
+- **Diagnóstico RAG:** con el modo diagnóstico activado en Configuración, cada respuesta documental muestra sus etapas (consulta, recuperación, fragmentos, contexto, LLM y respuesta) con los valores que el servidor ya registra: tiempos de embedding y SQL, candidatos vectoriales y léxicos, rangos RRF, llamadas, tokens y tiempos de Ollama, y el motivo de una abstención. Se lee con `GET /api/conversations/{id}/diagnostics`, limitado al workspace y con una lista blanca que nunca devuelve texto de preguntas, documentos ni respuestas.
+- **Paleta de comandos:** con ⌘K o Ctrl+K se va a secciones, acciones y conversaciones.
 
 Los documentos son datos no fiables: las llamadas documentales no reciben herramientas y las llamadas con herramientas no reciben documentos ni historial.
 
