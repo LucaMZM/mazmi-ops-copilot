@@ -10,4 +10,6 @@ Sin modo demo, sin claves y sin retoque ni composición: PNG escrito directament
 
 Diseño «Project Glass» en escala de grises: barra lateral flotante con indicador de cristal, robot de MAZMI y conversación como pantalla inicial. Las capturas se tomaron con `prefers-reduced-motion: reduce` para que ninguna transición quede a medias.
 
+`source-inspector.png`, `rag-inspector.png` y `command-palette.png` (17 de noviembre de 2026) muestran el Evidence Explorer, el diagnóstico RAG con los valores reales de esa respuesta y la paleta ⌘K.
+
 Son pasos sucesivos de un mismo recorrido: el ticket del muelle 3 se confirmó antes de las capturas, y la propuesta de `approvals.png` (carretilla del muelle 2) se rechazó justo después de capturarla para no dejar nada pendiente. `panel.png` muestra el panel abierto sobre la vista Workspace.

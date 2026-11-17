@@ -1,13 +1,14 @@
 "use client";
-import { forwardRef, useLayoutEffect, useRef, type ReactNode } from "react";
+import { forwardRef, Fragment, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { ArrowDown, FileSearch, ListChecks } from "lucide-react";
 import { Composer, type ComposerHandle } from "./composer";
 import { DraftMessage, MessageItem } from "./message-item";
-import type { Message, Mode, PendingAction, Source, SystemInfo } from "../product-types";
+import type { Message, Mode, PendingAction, SystemInfo } from "../product-types";
 import type { Draft } from "@/hooks/use-chat";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { RobotMark } from "../brand/robot-mark";
 
+const WELCOME = "¿Qué necesitas saber o resolver?";
 const STARTERS = [
   { text: "¿Qué dice la documentación sobre ", icon: FileSearch },
   { text: "Lista los tickets del workspace", icon: ListChecks },
@@ -25,8 +26,9 @@ type Props = {
   onSend: (text: string) => Promise<boolean>;
   onStop: () => void;
   onListen: () => void;
-  onSource: (source: Source) => void;
+  onSource: (message: Message, index: number) => void;
   onDecide: (action: PendingAction, approved: boolean) => void;
+  onDiagnose?: (message: Message) => void;
   feedback: ReactNode;
   context: ReactNode;
 };
@@ -46,6 +48,7 @@ export const ChatView = forwardRef<ComposerHandle, Props>(function ChatView(
     onListen,
     onSource,
     onDecide,
+    onDiagnose,
     feedback,
     context,
   },
@@ -101,7 +104,16 @@ export const ChatView = forwardRef<ComposerHandle, Props>(function ChatView(
               <span className="welcomeMark" aria-hidden="true">
                 <RobotMark size={34} className="blinking" />
               </span>
-              <h2 id="welcome-title">¿Qué necesitas saber o resolver?</h2>
+              <h2 id="welcome-title" className="kineticTitle">
+                {WELCOME.split(" ").map((word, i) => (
+                  <Fragment key={i}>
+                    {i > 0 && " "}
+                    <span className="revealWord" style={{ "--i": i } as CSSProperties}>
+                      {word}
+                    </span>
+                  </Fragment>
+                ))}
+              </h2>
               <p>
                 Pregunta a los documentos de este workspace y verifica cada cita, o prepara
                 una acción que solo se ejecuta cuando tú la confirmas.
@@ -126,6 +138,7 @@ export const ChatView = forwardRef<ComposerHandle, Props>(function ChatView(
               deciding={deciding}
               onSource={onSource}
               onDecide={onDecide}
+              onDiagnose={onDiagnose}
             />
           ))}
           {draft && <DraftMessage draft={draft} />}

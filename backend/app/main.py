@@ -48,6 +48,7 @@ from .auth import router as auth_router
 from .config import settings
 from .conversations import router as conversations_router
 from .db import DatabaseBusy, close_pool, get_conn
+from .diagnostics import router as diagnostics_router
 from .documents import recover_interrupted_indexing
 from .documents import router as documents_router
 from .errors import provider_error
@@ -104,6 +105,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(documents_router)
 app.include_router(conversations_router)
+app.include_router(diagnostics_router)
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",

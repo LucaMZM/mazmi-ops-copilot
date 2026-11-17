@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Archive, ChevronDown, Menu, Pencil, Plus, Volume2, VolumeX } from "lucide-react";
+import { Archive, ChevronDown, Menu, Pencil, Plus, Search, Volume2, VolumeX } from "lucide-react";
 import { RobotMark } from "../brand/robot-mark";
 
 type Props = {
@@ -8,6 +8,7 @@ type Props = {
   title: string;
   menuOpen: boolean;
   onMenu: () => void;
+  onPalette: () => void;
   isCopilot: boolean;
   conversationTitle: string | null;
   locked: boolean;
@@ -24,6 +25,7 @@ export function Topbar({
   title,
   menuOpen,
   onMenu,
+  onPalette,
   isCopilot,
   conversationTitle,
   locked,
@@ -94,6 +96,11 @@ export function Topbar({
         )}
       </div>
       <div className="headerActions">
+        <button className="paletteTrigger" aria-keyshortcuts="Meta+K Control+K" onClick={onPalette}>
+          <Search size={15} strokeWidth={1.75} aria-hidden="true" />
+          <span>Buscar</span>
+          <kbd aria-hidden="true">⌘K</kbd>
+        </button>
         {isCopilot && conversationTitle && !editing && (
           <>
             <button
